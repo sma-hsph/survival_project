@@ -29,33 +29,87 @@ library(magrittr)
 load("results/1-simulate_datasets/scenarioI.RData")
 load("results/1-simulate_datasets/scenarioII.RData")
 load("results/1-simulate_datasets/scenarioIII.RData")
+load("results/2-run_estimators/fits.RData")
 tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
                 tb_sim_II %>% dplyr::mutate(scenario = 2),
                 tb_sim_III %>% dplyr::mutate(scenario = 3))
-load("results/2-run_estimators/fits.RData")
 ```
 ```{r evaluate estimators}
 tb_eval <- tb_sim %>% 
   dplyr::mutate(results = l_results) %>% 
   dplyr::group_by(i_setup, scenario) %>% 
   dplyr::summarise(obs = list(evaluate(truth = b[[1]],
-                                    l_results = results %>% purrr::map("obs"))),
+                                       l_results = results %>% purrr::map("obs"))),
                    full = list(evaluate(truth = b[[1]],
-                                    l_results = results %>% purrr::map("full"))),
+                                        l_results = results %>% purrr::map("full"))),
                    opt = list(evaluate(truth = b[[1]],
-                                    l_results = results %>% purrr::map("opt"))),
+                                       l_results = results %>% purrr::map("opt"))),
                    fib = list(evaluate(truth = b[[1]],
-                                    l_results = results %>% purrr::map("fib"))),
+                                       l_results = results %>% purrr::map("fib"))),
                    mi = list(evaluate(truth = b[[1]],
-                                    l_results = results %>% purrr::map("mi")))) %>% 
+                                      l_results = results %>% purrr::map("mi")))) %>% 
+  dplyr::ungroup() %>% 
   dplyr::group_by(1:n()) %>% 
   dplyr::mutate(result_summarised = rbind(obs[[1]] %>% dplyr::mutate(estimator = "obs"),
-                               full[[1]] %>% dplyr::mutate(estimator = "full"),
-                               opt[[1]] %>% dplyr::mutate(estimator = "opt"),
-                               fib[[1]] %>% dplyr::mutate(estimator = "fib"),
-                               mi[[1]] %>% dplyr::mutate(estimator = "mi")) %>% 
-                  dplyr::mutate(i_setup = i_setup[1], scenario = scenario[1]) %>% 
+                                          full[[1]] %>% dplyr::mutate(estimator = "full"),
+                                          opt[[1]] %>% dplyr::mutate(estimator = "opt"),
+                                          fib[[1]] %>% dplyr::mutate(estimator = "fib"),
+                                          mi[[1]] %>% dplyr::mutate(estimator = "mi")) %>% 
+                  dplyr::mutate(i_setup = i_setup, scenario = scenario) %>% 
                   list()) %>% 
   magrittr::extract2("result_summarised") %>% 
-  purrr::reduce(rbind)
+  purrr::reduce(rbind) %>% 
+  dplyr::mutate(estimator = factor(estimator, levels = c("obs", "full", "opt", "fib", "mi")))
+tb_eval <- tb_eval %>% 
+  dplyr::left_join(tb_sim %>% dplyr::filter(rep == 1), by = c("i_setup", "scenario")) %>% 
+  dplyr::mutate(variable = variable %>% 
+                  dplyr::recode_factor(`1` = "M",
+                                       `2` = "Z"))
+```
+# Homogeneous studies
+```{r homogeneous}
+tb_print <- tb_eval %>% 
+  dplyr::filter(scenario == 1) %>% 
+  dplyr::mutate(b_Z = b %>% purrr::map_dbl(2), 
+                censoring = percCens %>% purrr::map_dbl(unique),
+                setup = paste0("b_Z=", b_Z, ", ", censoring, " censoring")) %>% 
+  dplyr::arrange(censoring, b_Z, variable, estimator) %>% 
+  dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
+```
+Performance on b_M (i.e., coefficient for the mediator) varies between estimators:
+```{r homogeneous print b_M}
+tb_print %>% 
+  dplyr::filter(variable == "M") %>% 
+  print()
+```
+Whereas for the missing covariates b_Z not so much:
+```{r homogeneous print b_M}
+tb_print %>% 
+  dplyr::filter(variable == "Z") %>% 
+  print()
+```
+# Studies with heterngeneous eT distributions
+```{r heterogeneous e_T}
+tb_print <- tb_eval %>% 
+  dplyr::filter(scenario == 2) %>%
+  dplyr::mutate(dist_eT = dist_eT %>% purrr::map_chr(paste, collapse = ","), 
+                sd_eT = sd_eT %>% purrr::map_chr(paste, collapse = ","),
+                setup = paste0("distribution ", dist_eT, ", sd(e_T) ", sd_eT)) %>% 
+  dplyr::arrange(dist_eT, sd_eT, variable, estimator) %>% 
+  dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
+tb_print %>% 
+  dplyr::filter(variable == "M") %>% 
+  print()
+```
+# Studies with heterngeneous censoring distribution
+```{r heterogeneous percCens}
+tb_print <- tb_eval %>% 
+  dplyr::filter(scenario == 3) %>%
+  dplyr::mutate(censoring = percCens %>% purrr::map_chr(paste, collapse = ","), 
+                setup = paste0("censoring ", censoring)) %>% 
+  dplyr::arrange(censoring, variable, estimator) %>% 
+  dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
+tb_print %>% 
+  dplyr::filter(variable == "M") %>% 
+  print()
 ```
