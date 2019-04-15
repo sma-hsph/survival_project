@@ -28,7 +28,7 @@ library(magrittr)
 ## Homogeneous studies
 ```{r simulation parameters scenario I}
 # number of simulation runs
-rep <- 1:100
+rep <- 1:50
 # total sample size
 nSamples <- c(200)
 # number of studies
@@ -39,13 +39,13 @@ missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
 dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
 sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.1, 0.1),
+percCens <- tibble::tibble(percCens = list(c(0.2, 0.2),
                                            c(0.4, 0.4)))
 # true coefficients
-b <- tibble::tibble(b = list(c(1, 0),
-                             c(1, 1),
-                             c(1, 2)))
-a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(2, 0),
+                             c(2, 2),
+                             c(2, 4)))
+a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
 tb_sim_I <- tidyr::crossing(
   nSamples,
   nStudies,
@@ -67,25 +67,25 @@ simulation_sanitycheck(tb_sim_I)
 ## Studies with heterngeneous eT distributions
 ```{r simulation parameters scenario II}
 # number of simulation runs
-rep <- 1:100
+rep <- 1:50
 # total sample size
-nSamples <- c(200)
+nSamples <- c(400)
 # number of studies
-nStudies <- c(2)
+nStudies <- c(4)
 # missingness of studies
-missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+missingness <- tibble::tibble(missingness = list(c(FALSE, FALSE, TRUE, TRUE)))
 # distribution of error terms
-tb_eT <- tibble::tibble(dist_eT = list(c("normal", "evd"),
-                                       c("normal", "normal"),
-                                       c("evd", "evd")),
-                        sd_eT = list(c(1, 1),
-                                     c(1, 2),
-                                     c(1, 2)))
+tb_eT <- tibble::tibble(dist_eT = list(c("normal", "evd", "normal", "evd"),
+                                       c("normal", "normal", "normal", "normal"),
+                                       c("normal", "normal", "evd", "evd")),
+                        sd_eT = list(c(1, 1, 1, 1),
+                                     c(1, 2, 1, 2),
+                                     c(1, 1, 1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.1, 0.1)))
+percCens <- tibble::tibble(percCens = list(c(0.2, 0.2, 0.2, 0.2)))
 # true coefficients
-b <- tibble::tibble(b = list(c(1, 1)))
-a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(2, 2)))
+a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
 tb_sim_II <- tidyr::crossing(
   nSamples,
   nStudies,
@@ -106,22 +106,23 @@ simulation_sanitycheck(tb_sim_II)
 ## Studies with heterngeneous ceonsoring distributions
 ```{r simulation parameters scenario III}
 # number of simulation runs
-rep <- 1:100
+rep <- 1:50
 # total sample size
-nSamples <- c(200)
+nSamples <- c(400)
 # number of studies
-nStudies <- c(2)
+nStudies <- c(4)
 # missingness of studies
-missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+missingness <- tibble::tibble(missingness = list(c(FALSE, FALSE, TRUE, TRUE)))
 # distribution of error terms
-dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
-sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
+dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal", "normal", "normal")))
+sd_eT <- tibble::tibble(sd_eT = list(c(1, 1, 1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.1, 0.2),
-                                           c(0.1, 0.4)))
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.4, 0.1, 0.4),
+                                           c(0.1, 0.1, 0.4, 0.4),
+                                           c(0.1, 0.3, 0.2, 0.4)))
 # true coefficients
-b <- tibble::tibble(b = list(c(1, 1)))
-a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(2, 2)))
+a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
 tb_sim_III <- tidyr::crossing(
   nSamples,
   nStudies,

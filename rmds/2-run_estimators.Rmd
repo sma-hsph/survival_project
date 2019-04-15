@@ -34,7 +34,7 @@ tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
                 tb_sim_III %>% dplyr::mutate(scenario = 3))
 ```
 ```{r run estimators}
-ncores <- 20
+ncores <- 30
 N <- nrow(tb_sim)
 library(foreach)
 doParallel::registerDoParallel(ncores)
@@ -51,7 +51,7 @@ l_results <- foreach(i = 1:N) %dopar% {
                        matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
                        study = i_sim$dataset[[1]]$study,
                        missing = i_sim$dataset[[1]]$missing,
-                       B = 500,
+                       B = 250,
                        ncores = 1)
   fit.full <- 
     AFTmeta::gehan.full(y = i_sim$dataset[[1]]$logY,
@@ -60,7 +60,7 @@ l_results <- foreach(i = 1:N) %dopar% {
                         matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
                         study = i_sim$dataset[[1]]$study,
                         missing = i_sim$dataset[[1]]$missing,
-                        B = 500,
+                        B = 250,
                         ncores = 1)
   fit.opt <- 
     AFTmeta::gehan.opt(y = i_sim$dataset[[1]]$logY,
@@ -69,7 +69,7 @@ l_results <- foreach(i = 1:N) %dopar% {
                        matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
                        study = i_sim$dataset[[1]]$study,
                        missing = i_sim$dataset[[1]]$missing,
-                       B = 500,
+                       B = 250,
                        ncores = 1)
   fit.fib <- 
     AFTmeta::gehan.fib(y = i_sim$dataset[[1]]$logY,
@@ -78,7 +78,7 @@ l_results <- foreach(i = 1:N) %dopar% {
                        matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
                        study = i_sim$dataset[[1]]$study,
                        missing = i_sim$dataset[[1]]$missing, 
-                       B = 500,
+                       B = 250,
                        ncores = 1)
   fit.mi <- 
     AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
