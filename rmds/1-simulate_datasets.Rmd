@@ -1,0 +1,182 @@
+---
+title: "1-Simulate datasets"
+author: "Siyuan Ma"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+# Overview
+- Create table of simulation parameter combinations.
+1. Homogeneous studies.
+2. Studies with heterogeneous cohort characteristics (i.e. eT distribution).
+3. Studies with different design (i.e., censoring distribution).
+- Simulate datasets.
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+```{r setup2, echo=FALSE}
+rm(list = ls())
+for(i.function in list.files("functions/", full.names = TRUE)) {
+  source(i.function)
+}
+dir_output <- "results/1-simulate_datasets/"
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+# Create table of simulation parameter combinations.
+## Homogeneous studies
+```{r simulation parameters scenario I}
+# number of simulation runs
+rep <- 1:100
+# total sample size
+nSamples <- c(200)
+# number of studies
+nStudies <- c(2)
+# missingness of studies
+missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+# distribution of error terms
+dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
+sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
+# percentage censoring
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.1),
+                                           c(0.4, 0.4)))
+# true coefficients
+b <- tibble::tibble(b = list(c(1, 0),
+                             c(1, 1),
+                             c(1, 2)))
+a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+tb_sim_I <- tidyr::crossing(
+  nSamples,
+  nStudies,
+  missingness,
+  dist_eT,
+  sd_eT,
+  percCens,
+  b,
+  a,
+  rep
+) %>% 
+  dplyr::mutate(study = nStudies %>% 
+                  purrr::map2(nSamples, function(nStudies, nSamples) 
+                    rep(1:nStudies, each = nSamples / nStudies)),
+                seed = 1:n())
+simulation_sanitycheck(tb_sim_I)
+```
+## Studies with heterngeneous eT distributions
+```{r simulation parameters scenario II}
+# number of simulation runs
+rep <- 1:100
+# total sample size
+nSamples <- c(200)
+# number of studies
+nStudies <- c(2)
+# missingness of studies
+missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+# distribution of error terms
+tb_eT <- tibble::tibble(dist_eT = list(c("normal", "evd"),
+                                       c("normal", "normal"),
+                                       c("evd", "evd")),
+                        sd_eT = list(c(1, 1),
+                                     c(1, 2),
+                                     c(1, 2)))
+# percentage censoring
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.1)))
+# true coefficients
+b <- tibble::tibble(b = list(c(1, 1)))
+a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+tb_sim_II <- tidyr::crossing(
+  nSamples,
+  nStudies,
+  missingness,
+  tb_eT,
+  percCens,
+  b,
+  a,
+  rep
+) %>% 
+  dplyr::mutate(study = nStudies %>% 
+                  purrr::map2(nSamples, function(nStudies, nSamples) 
+                    rep(1:nStudies, each = nSamples / nStudies)),
+                seed = 1:n())
+simulation_sanitycheck(tb_sim_II)
+```
+## Studies with heterngeneous ceonsoring distributions
+```{r simulation parameters scenario III}
+# number of simulation runs
+rep <- 1:100
+# total sample size
+nSamples <- c(200)
+# number of studies
+nStudies <- c(2)
+# missingness of studies
+missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+# distribution of error terms
+dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
+sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
+# percentage censoring
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.2),
+                                           c(0.1, 0.4)))
+# true coefficients
+b <- tibble::tibble(b = list(c(1, 1)))
+a <- tibble::tibble(a = list(matrix(1, nrow = 1, ncol = 1)))
+tb_sim_III <- tidyr::crossing(
+  nSamples,
+  nStudies,
+  missingness,
+  dist_eT,
+  sd_eT,
+  percCens,
+  b,
+  a,
+  rep
+) %>% 
+  dplyr::mutate(study = nStudies %>% 
+                  purrr::map2(nSamples, function(nStudies, nSamples) 
+                    rep(1:nStudies, each = nSamples / nStudies)),
+                seed = 1:n())
+simulation_sanitycheck(tb_sim_III)
+```
+
+# Simulate datasets.
+```{r simulate datasets}
+tb_sim_I <- tb_sim_I %>% 
+  dplyr::group_by(1:n()) %>% 
+  dplyr::mutate(dataset = simulation(b = b[[1]],
+                                     a = a[[1]],
+                                     study = study[[1]],
+                                     missingness = missingness[[1]],
+                                     dist_eT = dist_eT[[1]],
+                                     sd_eT = sd_eT[[1]],
+                                     percCens = percCens[[1]],
+                                     seed = seed) %>% 
+                  list()) %>% 
+  dplyr::ungroup()
+tb_sim_II <- tb_sim_II %>% 
+  dplyr::group_by(1:n()) %>% 
+  dplyr::mutate(dataset = simulation(b = b[[1]],
+                                     a = a[[1]],
+                                     study = study[[1]],
+                                     missingness = missingness[[1]],
+                                     dist_eT = dist_eT[[1]],
+                                     sd_eT = sd_eT[[1]],
+                                     percCens = percCens[[1]],
+                                     seed = seed) %>% 
+                  list()) %>% 
+  dplyr::ungroup()
+tb_sim_III <- tb_sim_III %>% 
+  dplyr::group_by(1:n()) %>% 
+  dplyr::mutate(dataset = simulation(b = b[[1]],
+                                     a = a[[1]],
+                                     study = study[[1]],
+                                     missingness = missingness[[1]],
+                                     dist_eT = dist_eT[[1]],
+                                     sd_eT = sd_eT[[1]],
+                                     percCens = percCens[[1]],
+                                     seed = seed) %>% 
+                  list()) %>% 
+  dplyr::ungroup()
+save(tb_sim_I, file = paste0(dir_output, "scenarioI.RData"))
+save(tb_sim_II, file = paste0(dir_output, "scenarioII.RData"))
+save(tb_sim_III, file = paste0(dir_output, "scenarioIII.RData"))
+```

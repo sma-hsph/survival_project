@@ -1,0 +1,102 @@
+---
+title: "2-Run estimators"
+author: "Siyuan Ma"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+# Overview
+- Run five different estimators on the simulated datasets.
+1. Naive Gehan estimator (with only fully observed data).
+2. Combined Gehan estimator (including studies with systematically missing covariates).
+3. Optimal Gehan estimator (optimal weighting of the two estimators).
+4. Bivariate MLE estimator given in 19222087.
+5. Multiple imputation estimator given in 23857554.
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+```{r setup2, echo=FALSE}
+rm(list = ls())
+for(i.function in list.files("functions/", full.names = TRUE)) {
+  source(i.function)
+}
+dir_output <- "results/2-run_estimators/"
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+```{r load datasets}
+load("results/1-simulate_datasets/scenarioI.RData")
+load("results/1-simulate_datasets/scenarioII.RData")
+load("results/1-simulate_datasets/scenarioIII.RData")
+tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
+                tb_sim_II %>% dplyr::mutate(scenario = 2),
+                tb_sim_III %>% dplyr::mutate(scenario = 3))
+```
+```{r run estimators}
+ncores <- 20
+N <- nrow(tb_sim)
+library(foreach)
+doParallel::registerDoParallel(ncores)
+start.time <- Sys.time()
+l_results <- foreach(i = 1:N) %dopar% {
+  i_sim <- tb_sim[i, ]
+  pX <- nrow(i_sim$a[[1]])
+  pZ <- ncol(i_sim$a[[1]])
+  
+  fit.obs <- 
+    AFTmeta::gehan.obs(y = i_sim$dataset[[1]]$logY,
+                       delta = i_sim$dataset[[1]]$delta,
+                       matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                       matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                       study = i_sim$dataset[[1]]$study,
+                       missing = i_sim$dataset[[1]]$missing,
+                       B = 2,
+                       ncores = 1)
+  fit.full <- 
+    AFTmeta::gehan.full(y = i_sim$dataset[[1]]$logY,
+                        delta = i_sim$dataset[[1]]$delta,
+                        matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                        matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                        study = i_sim$dataset[[1]]$study,
+                        missing = i_sim$dataset[[1]]$missing,
+                        B = 2,
+                        ncores = 1)
+  fit.opt <- 
+    AFTmeta::gehan.opt(y = i_sim$dataset[[1]]$logY,
+                       delta = i_sim$dataset[[1]]$delta,
+                       matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                       matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                       study = i_sim$dataset[[1]]$study,
+                       missing = i_sim$dataset[[1]]$missing,
+                       B = 500,
+                       ncores = 1)
+  fit.fib <- 
+    AFTmeta::gehan.fib(y = i_sim$dataset[[1]]$logY,
+                       delta = i_sim$dataset[[1]]$delta,
+                       matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                       matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                       study = i_sim$dataset[[1]]$study,
+                       missing = i_sim$dataset[[1]]$missing, 
+                       B = 500,
+                       ncores = 1)
+  fit.mi <- 
+    AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+                      delta = i_sim$dataset[[1]]$delta,
+                      matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                      matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                      study = i_sim$dataset[[1]]$study,
+                      missing = i_sim$dataset[[1]]$missing, 
+                      m = 5)
+  
+  return(list(obs = fit.obs,
+              full = fit.full,
+              opt = fit.opt,
+              fib = fit.fib,
+              mi = fit.mi
+              ))
+}
+print(Sys.time() - start.time)
+doParallel::stopImplicitCluster()
+save(l_results, file = paste0(dir_output, "fits.RData"))
+```
