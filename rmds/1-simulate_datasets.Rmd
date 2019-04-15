@@ -54,9 +54,10 @@ tb_sim_I <- tidyr::crossing(
   sd_eT,
   percCens,
   b,
-  a,
-  rep
-) %>% 
+  a
+) %>%
+  dplyr::mutate(i_setup = 1:n()) %>% 
+  tidyr::crossing(rep) %>% 
   dplyr::mutate(study = nStudies %>% 
                   purrr::map2(nSamples, function(nStudies, nSamples) 
                     rep(1:nStudies, each = nSamples / nStudies)),
@@ -93,8 +94,9 @@ tb_sim_II <- tidyr::crossing(
   percCens,
   b,
   a,
-  rep
-) %>% 
+) %>%
+  dplyr::mutate(i_setup = 1:n()) %>% 
+  tidyr::crossing(rep) %>% 
   dplyr::mutate(study = nStudies %>% 
                   purrr::map2(nSamples, function(nStudies, nSamples) 
                     rep(1:nStudies, each = nSamples / nStudies)),
@@ -129,8 +131,9 @@ tb_sim_III <- tidyr::crossing(
   percCens,
   b,
   a,
-  rep
-) %>% 
+) %>%
+  dplyr::mutate(i_setup = 1:n()) %>% 
+  tidyr::crossing(rep) %>% 
   dplyr::mutate(study = nStudies %>% 
                   purrr::map2(nSamples, function(nStudies, nSamples) 
                     rep(1:nStudies, each = nSamples / nStudies)),
@@ -151,7 +154,8 @@ tb_sim_I <- tb_sim_I %>%
                                      percCens = percCens[[1]],
                                      seed = seed) %>% 
                   list()) %>% 
-  dplyr::ungroup()
+  dplyr::ungroup() %>% 
+  dplyr::select(-`1:n()`)
 tb_sim_II <- tb_sim_II %>% 
   dplyr::group_by(1:n()) %>% 
   dplyr::mutate(dataset = simulation(b = b[[1]],
@@ -163,7 +167,8 @@ tb_sim_II <- tb_sim_II %>%
                                      percCens = percCens[[1]],
                                      seed = seed) %>% 
                   list()) %>% 
-  dplyr::ungroup()
+  dplyr::ungroup() %>% 
+  dplyr::select(-`1:n()`)
 tb_sim_III <- tb_sim_III %>% 
   dplyr::group_by(1:n()) %>% 
   dplyr::mutate(dataset = simulation(b = b[[1]],
@@ -175,7 +180,8 @@ tb_sim_III <- tb_sim_III %>%
                                      percCens = percCens[[1]],
                                      seed = seed) %>% 
                   list()) %>% 
-  dplyr::ungroup()
+  dplyr::ungroup() %>% 
+  dplyr::select(-`1:n()`)
 save(tb_sim_I, file = paste0(dir_output, "scenarioI.RData"))
 save(tb_sim_II, file = paste0(dir_output, "scenarioII.RData"))
 save(tb_sim_III, file = paste0(dir_output, "scenarioIII.RData"))

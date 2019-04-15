@@ -8,11 +8,11 @@ output:
 ---
 # Overview
 - Run five different estimators on the simulated datasets.
-1. Naive Gehan estimator (with only fully observed data).
-2. Combined Gehan estimator (including studies with systematically missing covariates).
-3. Optimal Gehan estimator (optimal weighting of the two estimators).
-4. Bivariate MLE estimator given in 19222087.
-5. Multiple imputation estimator given in 23857554.
+  1. Naive Gehan estimator (with only fully observed data).
+  2. Combined Gehan estimator (including studies with systematically missing covariates).
+  3. Optimal Gehan estimator (optimal weighting of the two estimators).
+  4. Bivariate MLE estimator given in 19222087.
+  5. Multiple imputation estimator given in 23857554.
 ```{r setup, echo=FALSE} 
 knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```

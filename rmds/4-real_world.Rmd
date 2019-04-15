@@ -1,0 +1,157 @@
+---
+title: "2-Real world"
+author: "Siyuan Ma"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+# Overview
+- Download RNA and microRNA data from TCGA and mRNA only data from 18167339.
+- Perform estimates
+- Analyze
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+```{r setup2, echo=FALSE}
+rm(list = ls())
+for(i.function in list.files("functions/", full.names = TRUE)) {
+  source(i.function)
+}
+dir_output <- "results/4-real_world/"
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+# Reproduce results from 18167339
+Yu et al., 2008{18167339} identified five microRNAs signatures that could jointly predict survival of of non-small-cell lung cancer. These mRNAs and their corresponding risk score coefficients are:
+```{r mRNA signatures}
+# Equation in Experimental Procedures - Statistical Analysis in 18167339
+micrornas <- c("miR-137", "miR-182*", "miR-221", "miR-372", "let-7a")
+risk_equation <- c("miR-137" = 0.15, "miR-182*" = 0.28, 
+                   "miR-221" = -0.13, "miR-372" = 0.31,
+                   "let-7a" = -0.14)
+print(risk_equation)
+```
+We first attempt to reproduce their results, by performing univariate and adjsuted (adjusting for age, gender, and cancer stage) Cox regression in the same dataset, on all of the five mRNAs as well as the calculated risk score.
+```{r load 18167339 calcuate scores and Cox regression}
+# This is supplemental table 2 in 18167339 (Yu et al., 2008 )
+stb2_Yu2008 <- readr::read_tsv("https://www.cell.com/cms/10.1016/j.ccr.2007.12.008/attachment/746b948d-33a2-4121-a180-aacd7eec6161/mmc2.txt",
+                               col_types = readr::cols(
+                                 .default = readr::col_double(),
+                                 `Patient ID` = readr::col_character(),
+                                 Dataset = readr::col_character(),
+                                 Gender = readr::col_character(),
+                                 `Cell type` = readr::col_character(),
+                                 Stage = readr::col_character(),
+                                 Status = readr::col_character()
+                               ))
+# df_yu2008$stageI <- df_yu2008$Stage == 'I'
+# df_yu2008$stageII <- df_yu2008$Stage == 'II'
+# df_yu2008$stageIII_IV <- df_yu2008$Stage %in% c( 'III', 'IV' )
+# subset to subtype
+table(stb2_Yu2008$`Cell type`)
+df_yu2008_luad <- subset(stb2_Yu2008, `Cell type`== "Squamous cell carcinoma")
+df_yu2008_luad$risk_score <- as.matrix(df_yu2008_luad[, micrornas]) %*% risk_equation
+hr_uni <- c(micrornas, "risk_score") %>% 
+  purrr::map_dfr(function(variable) {
+    survival::coxph(survival::Surv(survival_month, survival) ~ 
+                      df_yu2008_luad[, variable, drop = TRUE],
+                    data = df_yu2008_luad) %>% 
+      summary %>% 
+      magrittr::extract2("coefficients") %>% 
+      magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
+      t() %>% as.data.frame() %>% 
+      dplyr::mutate(variable = variable)
+  })
+hr_adj <- c(micrornas, "risk_score") %>% 
+  purrr::map_dfr(function(variable) {
+    survival::coxph(survival::Surv(survival_month, survival) ~ 
+                      df_yu2008_luad[, variable, drop = TRUE] + Age + Gender + factor(Stage),
+                    data = df_yu2008_luad) %>% 
+      summary %>% 
+      magrittr::extract2("coefficients") %>% 
+      magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
+      t() %>% as.data.frame() %>% 
+      dplyr::mutate(variable = variable)
+  })
+```
+We can see that the directionality of the Cox regression coefficients agree with the risk score coefficients
+```{r print results}
+rbind(hr_uni %>% dplyr::mutate(model = "univariate"),
+      hr_adj %>% dplyr::mutate(model = "adjusted"))
+```
+```{r TCGA}
+# tcga_luad_mRNA <- getTCGA(disease = "LUAD", data.type = "RNASeq", type = "count", filter = "Y",
+#                           p = getOption("mc.cores", 2L), clinical = TRUE, cvars = "OS")
+# tcga_luad_miRNA <- getTCGA(disease = "LUAD", data.type = "miRNASeq", type = "count", filter = "Y",
+#                            p = getOption("mc.cores", 2L), clinical = FALSE, cvars = "OS")
+# save( tcga_luad_mRNA, file='data/TCGA/mRNA.RData' )
+# save( tcga_luad_miRNA, file='data/TCGA/miRNA.RData' )
+load( 'data/TCGA/mRNA.RData' )
+load( 'data/TCGA/miRNA.RData' )
+samples_mRNA <- gsub( '................$', '', colnames( tcga_luad_mRNA[[1]] ), perl=T )
+samples_miRNA <- gsub( '................$', '', colnames( tcga_luad_miRNA[[1]] ), perl=T )
+df_meta_tcga <- data.frame( tcga_luad_mRNA$clinical,
+                            check.rows = F,
+                            stringsAsFactors = F
+)
+df_meta_tcga$yearstobirth <- as.numeric( df_meta_tcga$yearstobirth )
+df_meta_tcga$vitalstatus <- as.numeric( df_meta_tcga$vitalstatus )
+df_meta_tcga$daystodeath <- as.numeric( df_meta_tcga$daystodeath )
+df_meta_tcga$daystolastfollowup <- as.numeric( df_meta_tcga$daystolastfollowup )
+df_meta_tcga$survival_time <- df_meta_tcga$daystodeath
+df_meta_tcga$survival_time[is.na( df_meta_tcga$daystodeath )] <- 
+  df_meta_tcga$daystolastfollowup[is.na( df_meta_tcga$daystodeath )]
+df_meta_tcga <- df_meta_tcga[(!is.na(df_meta_tcga$survival_time)) & 
+                             (!is.na(df_meta_tcga$yearstobirth)) &
+                             (!is.na(df_meta_tcga$pathologicstage)), ]
+samples_common <- intersect( intersect( samples_mRNA, samples_miRNA ), rownames( df_meta_tcga ) )
+df_meta_tcga <- df_meta_tcga[samples_common, ]
+df_meta_tcga$stagenew <- df_meta_tcga$pathologicstage
+df_meta_tcga$stagenew[grepl( 'stage i([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'I'
+df_meta_tcga$stagenew[grepl( 'stage ii([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'II'
+df_meta_tcga$stagenew[grepl( 'stage iii([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'III'
+df_meta_tcga$stagenew[grepl( 'stage iv([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'IV'
+df_meta_tcga$stagenew <- factor( df_meta_tcga$stagenew, levels=c('I', 'II', 'III', 'IV') )
+df_meta_tcga$stageI <- df_meta_tcga$stagenew == 'I'
+df_meta_tcga$stageII <- df_meta_tcga$stagenew == 'II'
+df_meta_tcga$stageIII_IV <- df_meta_tcga$stagenew %in% c( 'III', 'IV' )
+# table( sapply( samples_common, function(sample)sum(samples_miRNA == sample) ) )
+# table( sapply( samples_common, function(sample)sum(samples_mRNA == sample) ) )
+mat_tcga_mRNA <- sapply( samples_common, function( sample ) {
+  tcga_luad_mRNA$dat[, grep(sample, 
+                            colnames( tcga_luad_mRNA$dat ), 
+                            fixed = T)[1]]
+} ) + 0.5
+colnames( mat_tcga_mRNA ) <- samples_common
+mat_tcga_mRNA <- log10( apply( mat_tcga_mRNA, 2, function(x) x/sum(x) ) )
+mat_tcga_miRNA <- sapply( samples_common, function( sample ) {
+  tcga_luad_miRNA$dat[, grep(sample, 
+                             colnames( tcga_luad_miRNA$dat ), 
+                             fixed = T)[1]]
+} ) + 0.5
+colnames( mat_tcga_miRNA ) <- samples_common
+mat_tcga_miRNA <- log10( apply( mat_tcga_miRNA, 2, function(x) x/sum(x) ) )
+mat_tcga_miRNA_hsa_let_7a <- matrix( mat_tcga_miRNA[1, ], nrow=1 )
+colnames( mat_tcga_miRNA_hsa_let_7a ) <- colnames( mat_tcga_miRNA )
+rownames( mat_tcga_miRNA_hsa_let_7a ) <- 'hsa-let-7a'
+# the three hsa-let-7a's have pretty similar expression
+mat_tcga_miRNA <- rbind( mat_tcga_miRNA, mat_tcga_miRNA_hsa_let_7a )
+
+mat_tcga_risk_score <- matrix( t(mat_tcga_miRNA[micrornas, ])%*%risk_equation, nrow=1 )
+colnames( mat_tcga_risk_score ) <- colnames( mat_tcga_miRNA )
+rownames( mat_tcga_risk_score ) <- 'risk_score'
+mat_tcga_miRNA <- rbind( mat_tcga_miRNA, mat_tcga_risk_score )
+@
+
+<<TCGA_validate_Yu_et_al_results, cache=T, echo=F, message=F, results='asis'>>=
+hr_uni_validation <- sapply( c(micrornas, 'risk_score'), function(microrna){
+  return( summary(coxph( Surv( survival_time/30, vitalstatus ) ~ mat_tcga_miRNA[microrna, ],
+                     data=df_meta_tcga ) )$coef[c(1, 3, 5)] )
+} )
+hr_multi_validation <- sapply( c(micrornas, 'risk_score'), function(microrna){
+  return( summary(coxph( Surv( survival_time/30, vitalstatus ) ~ mat_tcga_miRNA[microrna, ] + yearstobirth + gender + stagenew,
+                     data=df_meta_tcga ) )$coef[1, c(1, 3, 5)] )
+} )
+print( xtable( data.frame( microRNA=c( micrornas, 'risk_score'), log_hr_uni=hr_uni_validation[1, ], log_hr_uni_sd=hr_uni_validation[2, ], p_uni=hr_uni_validation[3, ], log_hr_multi=hr_multi_validation[1, ], log_hr_multi_sd=hr_multi_validation[2, ], p_multi=hr_multi_validation[3, ] ) ), include.rownames=F )
+```

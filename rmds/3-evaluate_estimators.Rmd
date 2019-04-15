@@ -1,0 +1,61 @@
+---
+title: "3-Evaluate estimators"
+author: "Siyuan Ma"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+# Overview
+- Evaluate performance of the five estimators x three scenarios.
+- mean
+- empirical variance
+- bias
+- MSE
+- coverage probability
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+```{r setup2, echo=FALSE}
+rm(list = ls())
+for(i.function in list.files("functions/", full.names = TRUE)) {
+  source(i.function)
+}
+dir_output <- "results/3-evaluate_estimators/"
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+```{r load datasets}
+load("results/1-simulate_datasets/scenarioI.RData")
+load("results/1-simulate_datasets/scenarioII.RData")
+load("results/1-simulate_datasets/scenarioIII.RData")
+tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
+                tb_sim_II %>% dplyr::mutate(scenario = 2),
+                tb_sim_III %>% dplyr::mutate(scenario = 3))
+load("results/2-run_estimators/fits.RData")
+```
+```{r evaluate estimators}
+tb_eval <- tb_sim %>% 
+  dplyr::mutate(results = l_results) %>% 
+  dplyr::group_by(i_setup, scenario) %>% 
+  dplyr::summarise(obs = list(evaluate(truth = b[[1]],
+                                    l_results = results %>% purrr::map("obs"))),
+                   full = list(evaluate(truth = b[[1]],
+                                    l_results = results %>% purrr::map("full"))),
+                   opt = list(evaluate(truth = b[[1]],
+                                    l_results = results %>% purrr::map("opt"))),
+                   fib = list(evaluate(truth = b[[1]],
+                                    l_results = results %>% purrr::map("fib"))),
+                   mi = list(evaluate(truth = b[[1]],
+                                    l_results = results %>% purrr::map("mi")))) %>% 
+  dplyr::group_by(1:n()) %>% 
+  dplyr::mutate(result_summarised = rbind(obs[[1]] %>% dplyr::mutate(estimator = "obs"),
+                               full[[1]] %>% dplyr::mutate(estimator = "full"),
+                               opt[[1]] %>% dplyr::mutate(estimator = "opt"),
+                               fib[[1]] %>% dplyr::mutate(estimator = "fib"),
+                               mi[[1]] %>% dplyr::mutate(estimator = "mi")) %>% 
+                  dplyr::mutate(i_setup = i_setup[1], scenario = scenario[1]) %>% 
+                  list()) %>% 
+  magrittr::extract2("result_summarised") %>% 
+  purrr::reduce(rbind)
+```
