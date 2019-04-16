@@ -14,10 +14,11 @@ output:
       - As can be seen from the results, the relative performance between obs and full can vary given underlying parameters. However opt should always have close performance as the better one of the two.
   4. fib: AFT version of the proposed bivariate normal MLE Cox PH estimator from 19222087.
       - This estimator is based on the observation that betahat (the fully adjusted regression coefficients, can only be fitted on non-missing studies), and gammahat (the marginal regression coefficients, can be fitted on both non-missing studies and studies with systematically missing covariates), should follow a joint (asymptotic) bivariate normal distribution. If one is willing to assume that the covariance of this joint normal is the same across studies, it is then possible to write the likelihood for all per-study betahats and gammahats as the sum of the full joint likelihood for (betahat, gammahat) on non-missing studies, and the marginal likelihood for gammahat alone on studies with missingness. 
-      - I think the assumptions of this method fail when different cohort might have difference characterstics, resulting in different covariance structures on (betahat, gammahat) across studies. In practice, I tried to realize this by specifying different distributions of the error term for time, e_T, as well as different censoring percentages. However as the summary tables show they do not seem to affect its performance too much.
+      - I think the assumptions of this method fail when different cohort might have difference characterstics, resulting in different covariance structures on (betahat, gammahat) across studies. In practice, I tried to realize this by specifying different distributions of the error term for time, e_T, as well as different censoring percentages. However as the summary tables show they do not seem to affect its performance too much, with one exception (see Scenario II).
   5. mi: AFT version of the proposed multiple imputation estimator from 23857554.
       - They specified a MI model with random effects. In my implementation I used mice::mice and modelling the missing covariates after all other covariates, the censored log survival times, as well as the censoring variable.
       - Because data is generated with a linear model (log survival time ~ missing covariates + non-missing covariates), this means the MI would fail when censored survival time is not good surrogate for true survival. Additionally, any difference across cohorts (survival time distribution, censoring percentage) would cause this method to fail. Both of these can be observed across the three simulation scenarios.
+- Tables here correspond to the three summary tables in the current version of the manuscript.
 
 ```{r setup, echo=FALSE} 
 knitr::opts_knit$set(root.dir = normalizePath(".."))
@@ -74,7 +75,7 @@ tb_eval <- tb_eval %>%
   dplyr::left_join(tb_sim %>% dplyr::filter(rep == 1), by = c("i_setup", "scenario"))
 ```
 
-# Homogeneous studies
+# Scenario I: homogeneous studies
 Here I simulated two studies with equal sample size (n=100), one with all 3 variabes and one with one covariate (Z) missing. beta for the non-missing covariates were held constant (1, 1), while beta for the missing covariate, b_Z varies (0, 1, 2). I also varied censoring percentages to either 0.2 for both studies or 0.4 for both.
 
 - Main takeaways:
@@ -98,6 +99,7 @@ Performance of estimates of the non-missing coefficients can vary given b_Z:
 ```{r homogeneous print b_M}
 tb_print %>% 
   dplyr::filter(variable == 1) %>% 
+  dplyr::select(-variable) %>% 
   knitr::kable(format = "html") %>% 
   kableExtra::kable_styling() %>% 
   kableExtra::scroll_box(height = "500px")
@@ -108,19 +110,21 @@ Not so much for Z itself:
 ```{r homogeneous print b_Z}
 tb_print %>% 
   dplyr::filter(variable == 3) %>% 
+  dplyr::select(-variable) %>% 
   knitr::kable(format = "html") %>% 
   kableExtra::kable_styling() %>% 
   kableExtra::scroll_box(height = "500px")
 ```
 
-# Studies with heterngeneous cohort characteristics
+# Scenario II: studies with heterngeneous cohort characteristics
 In this scenario the distribution of underlying survival time is different across cohorts, either in the family (normal or evd), or in its standard deviation. The interpretation would be that cohorts are of different populations and might have different characteristics. Assumptions for the fib estimator (that the asymptotic variance of (beta, gamma) is the same across studies) should fail here. Assumptions for the MI procedure also fails. Four studies (two missing, two non-missing) were simulated for each setup.
 
 - Main takeaways:
   - The estimators obs, full, and opt are still unbiased because the objective function is calculated within each study then summed across. All assumptions for these estimating equation based estimators still hold.
   - fib also should not be biased, as it is estimated as betahat_avail + A( gammahat_avail - gammahat_missing), where betahat_avail and gammahat_avail are weighted average of per-study full and marginal coefficients in the fully observed studies. gammahat_missing is weighted average of marginal coefficients in studies with systematically missing covariates. 
-      - I had hoped to see scenarios where opt has better performance than fib, given that the latter's assumptions were violated. This was not the case.
-  - MI estimator has very sever bias when cohort characteristics vary.
+      - I hoped to see scenarios where opt has better performance than fib, given that the latter's assumptions were violated. 
+      - This seems to be only the case where the spread (i.e., standard deviation) of survival time changes greatly between studies.
+  - MI estimator has very severe bias when cohort characteristics vary.
 
 ```{r heterogeneous e_T}
 tb_print <- tb_eval %>% 
@@ -132,12 +136,13 @@ tb_print <- tb_eval %>%
   dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
 tb_print %>% 
   dplyr::filter(variable == 1) %>% 
+  dplyr::select(-variable) %>% 
   knitr::kable(format = "html") %>% 
   kableExtra::kable_styling() %>% 
   kableExtra::scroll_box(height = "500px")
 ```
 
-# Studies with heterngeneous study designs.
+# Scenario III: studies with heterngeneous study designs.
 Lastly we evaluate the scenario where the censoring distribution varies across cohorts. The interpretation would be that cohorts have different designs (follow-up periods). Same as the previous scenario, assumptions for both the fib and the mi estimators fail here. 
 
 - Main takeaways:
@@ -152,6 +157,7 @@ tb_print <- tb_eval %>%
   dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
 tb_print %>% 
   dplyr::filter(variable == 1) %>% 
+  dplyr::select(-variable) %>% 
   knitr::kable(format = "html") %>% 
   kableExtra::kable_styling() %>% 
   kableExtra::scroll_box(height = "500px")
