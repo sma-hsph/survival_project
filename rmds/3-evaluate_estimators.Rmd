@@ -86,7 +86,7 @@ Here I simulated two studies with equal sample size (n=100), one with all 3 vari
 ```{r homogeneous}
 tb_print <- tb_eval %>% 
   dplyr::filter(scenario == 1) %>% 
-  dplyr::mutate(b_Z = b %>% purrr::map_dbl(2), 
+  dplyr::mutate(b_Z = b %>% purrr::map_dbl(3), 
                 censoring = percCens %>% purrr::map_dbl(unique),
                 setup = paste0("b_Z=", b_Z, ", ", censoring, " censoring")) %>% 
   dplyr::arrange(censoring, b_Z, variable, estimator) %>% 

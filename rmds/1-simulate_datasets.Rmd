@@ -39,7 +39,7 @@ missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
 dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
 sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.2, 0.2),
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.1),
                                            c(0.4, 0.4)))
 # true coefficients
 b <- tibble::tibble(b = list(c(1, 1, 0),
