@@ -42,10 +42,10 @@ sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
 percCens <- tibble::tibble(percCens = list(c(0.2, 0.2),
                                            c(0.4, 0.4)))
 # true coefficients
-b <- tibble::tibble(b = list(c(2, 0),
-                             c(2, 2),
-                             c(2, 4)))
-a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(1, 1, 0),
+                             c(1, 1, 1),
+                             c(1, 1, 2)))
+a <- tibble::tibble(a = list(matrix(c(1, 1), nrow = 2, ncol = 1)))
 tb_sim_I <- tidyr::crossing(
   nSamples,
   nStudies,
@@ -76,16 +76,16 @@ nStudies <- c(4)
 missingness <- tibble::tibble(missingness = list(c(FALSE, FALSE, TRUE, TRUE)))
 # distribution of error terms
 tb_eT <- tibble::tibble(dist_eT = list(c("normal", "evd", "normal", "evd"),
-                                       c("normal", "normal", "normal", "normal"),
-                                       c("normal", "normal", "evd", "evd")),
+                                       c("normal", "normal", "evd", "evd"),
+                                       c("normal", "normal", "normal", "normal")),
                         sd_eT = list(c(1, 1, 1, 1),
-                                     c(1, 2, 1, 2),
+                                     c(1, 4, 2, 3),
                                      c(1, 1, 1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.2, 0.2, 0.2, 0.2)))
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.1, 0.1, 0.1)))
 # true coefficients
-b <- tibble::tibble(b = list(c(2, 2)))
-a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(1, 1, 1)))
+a <- tibble::tibble(a = list(matrix(c(1, 1), nrow = 2, ncol = 1)))
 tb_sim_II <- tidyr::crossing(
   nSamples,
   nStudies,
@@ -119,10 +119,10 @@ sd_eT <- tibble::tibble(sd_eT = list(c(1, 1, 1, 1)))
 # percentage censoring
 percCens <- tibble::tibble(percCens = list(c(0.1, 0.4, 0.1, 0.4),
                                            c(0.1, 0.1, 0.4, 0.4),
-                                           c(0.1, 0.3, 0.2, 0.4)))
+                                           c(0.1, 0.4, 0.2, 0.3)))
 # true coefficients
-b <- tibble::tibble(b = list(c(2, 2)))
-a <- tibble::tibble(a = list(matrix(2, nrow = 1, ncol = 1)))
+b <- tibble::tibble(b = list(c(1, 1, 1)))
+a <- tibble::tibble(a = list(matrix(c(1, 1), nrow = 2, ncol = 1)))
 tb_sim_III <- tidyr::crossing(
   nSamples,
   nStudies,

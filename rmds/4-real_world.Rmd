@@ -1,5 +1,5 @@
 ---
-title: "2-Real world"
+title: "4-Real world"
 author: "Siyuan Ma"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -7,9 +7,14 @@ output:
     df_print: paged
 ---
 # Overview
-- Download RNA and microRNA data from TCGA and mRNA only data from 18167339.
-- Perform estimates
-- Analyze
+- Download miRNA only data from 18167339
+  - Validate signature miRNAs in the dataset.
+- Download mRNA and microRNA data from TCGA.
+  - Preprocessing, including metadata curation and RNASeq data normalization.
+  - Validate signature miRNAs and mRNAs in the dataset
+- Perform mediation meta-analysis on TCGA and 18167339.
+  - As it turns out, we found strong evidence for miRNA mediation effects on the lung cancer signature gene UHRF1. The microRNA/UHRF1 pathways have previously been reported in literature has novel cancer therapy targets.
+
 ```{r setup, echo=FALSE} 
 knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```
@@ -21,18 +26,23 @@ for(i.function in list.files("functions/", full.names = TRUE)) {
 dir_output <- "results/4-real_world/"
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
+library(ggplot2)
 ```
+
 # Reproduce results from 18167339
 Yu et al., 2008{18167339} identified five microRNAs signatures that could jointly predict survival of of non-small-cell lung cancer. These mRNAs and their corresponding risk score coefficients are:
-```{r mRNA signatures}
+
+```{r miRNA signatures}
 # Equation in Experimental Procedures - Statistical Analysis in 18167339
-micrornas <- c("miR-137", "miR-182*", "miR-221", "miR-372", "let-7a")
-risk_equation <- c("miR-137" = 0.15, "miR-182*" = 0.28, 
-                   "miR-221" = -0.13, "miR-372" = 0.31,
-                   "let-7a" = -0.14)
-print(risk_equation)
+miRNAs <- c("miR-137", "miR-182*", "miR-221", "miR-372", "let-7a")
+risk_miRNAs <- c("miR-137" = 0.15, "miR-182*" = 0.28, 
+                 "miR-221" = -0.13, "miR-372" = 0.31,
+                 "let-7a" = -0.14)
+print(risk_miRNAs)
 ```
-We first attempt to reproduce their results, by performing univariate and adjsuted (adjusting for age, gender, and cancer stage) Cox regression in the same dataset, on all of the five mRNAs as well as the calculated risk score.
+
+We first attempt to reproduce their results, by performing univariate Cox regression in the same dataset, on all of the five mRNAs as well as the calculated risk score. We can see that the directionality of the Cox regression coefficients agree with the risk score coefficients.
+
 ```{r load 18167339 calcuate scores and Cox regression}
 # This is supplemental table 2 in 18167339 (Yu et al., 2008 )
 stb2_Yu2008 <- readr::read_tsv("https://www.cell.com/cms/10.1016/j.ccr.2007.12.008/attachment/746b948d-33a2-4121-a180-aacd7eec6161/mmc2.txt",
@@ -49,10 +59,10 @@ stb2_Yu2008 <- readr::read_tsv("https://www.cell.com/cms/10.1016/j.ccr.2007.12.0
 # df_yu2008$stageII <- df_yu2008$Stage == 'II'
 # df_yu2008$stageIII_IV <- df_yu2008$Stage %in% c( 'III', 'IV' )
 # subset to subtype
-table(stb2_Yu2008$`Cell type`)
+# table(stb2_Yu2008$`Cell type`)
 df_yu2008_luad <- subset(stb2_Yu2008, `Cell type`== "Squamous cell carcinoma")
-df_yu2008_luad$risk_score <- as.matrix(df_yu2008_luad[, micrornas]) %*% risk_equation
-hr_uni <- c(micrornas, "risk_score") %>% 
+df_yu2008_luad$risk_score <- as.matrix(df_yu2008_luad[, miRNAs]) %*% risk_miRNAs
+hr_uni <- c(miRNAs, "risk_score") %>% 
   purrr::map_dfr(function(variable) {
     survival::coxph(survival::Surv(survival_month, survival) ~ 
                       df_yu2008_luad[, variable, drop = TRUE],
@@ -62,96 +72,289 @@ hr_uni <- c(micrornas, "risk_score") %>%
       magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
       t() %>% as.data.frame() %>% 
       dplyr::mutate(variable = variable)
-  })
-hr_adj <- c(micrornas, "risk_score") %>% 
+  }) %>% 
+  print()
+# hr_adj <- c(miRNAs, "risk_score") %>% 
+#   purrr::map_dfr(function(variable) {
+#     survival::coxph(survival::Surv(survival_month, survival) ~ 
+#                       df_yu2008_luad[, variable, drop = TRUE] + Age + Gender + factor(Stage),
+#                     data = df_yu2008_luad) %>% 
+#       summary %>% 
+#       magrittr::extract2("coefficients") %>% 
+#       magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
+#       t() %>% as.data.frame() %>% 
+#       dplyr::mutate(variable = variable)
+#   })
+```
+
+# TCGA
+Next we perform similary analysis for TCGA lung cancer patients. First acquire data and perform metadata curation.
+
+```{r TCGA metadata}
+dir.create("data/TCGA/", recursive = TRUE, showWarnings = FALSE)
+# Download TCGA data using TCGA2STAT; this only needs to be done once
+# tcga_luad_mRNA <- TCGA2STAT::getTCGA(disease = "LUAD", data.type = "RNASeq", 
+#                                      type = "count", filter = "Y",
+#                                      p = getOption("mc.cores", 2L), clinical = TRUE, 
+#                                      cvars = "OS")
+# tcga_luad_miRNA <- TCGA2STAT::getTCGA(disease = "LUAD", data.type = "miRNASeq", 
+#                                       type = "count", filter = "Y",
+#                                       p = getOption("mc.cores", 2L), clinical = FALSE, 
+#                                       cvars = "OS")
+# save(tcga_luad_mRNA, file = "data/TCGA/mRNA.RData")
+# save( tcga_luad_miRNA, file= "data/TCGA/miRNA.RData")
+load("data/TCGA/mRNA.RData")
+load("data/TCGA/miRNA.RData")
+
+# curate metadata
+tb_meta_tcga <- tibble::as_tibble(tcga_luad_mRNA$clinical) %>% 
+  dplyr::mutate(subject = rownames(tcga_luad_mRNA$clinical),
+                yearstobirth = as.numeric(yearstobirth),
+                vitalstatus = as.numeric(vitalstatus),
+                daystodeath = as.numeric(daystodeath),
+                daystolastfollowup = as.numeric(daystolastfollowup),
+                survival_month = ifelse(is.na(daystodeath),
+                                       daystolastfollowup,
+                                       daystodeath) / 30,
+                survival = vitalstatus,
+                Stage = pathologicstage %>% 
+                  dplyr::recode_factor("stage i" = "I",
+                                       "stage ia" = "I",
+                                       "stage ib" = "I",
+                                       "stage ii" = "II",
+                                       "stage iia" = "II",
+                                       "stage iib" = "II",
+                                       "stage iiia" = "III",
+                                       "stage iiib" = "III",
+                                       "stage iv" = "IV"),
+                Gender = gender,
+                Age = yearstobirth
+  ) %>% 
+  dplyr::filter(!is.na(survival_month),
+                !is.na(survival),
+                !is.na(Age),
+                !is.na(Gender),
+                !is.na(Stage))
+```
+
+Next we perform normalization on the mRNA and miRNA seq data. Briefly, for each sample, sequencing read counts for either mRNA or miRNA are:
+1. Scaled by sequencing depth, by DESeq2
+2. log2 transformed (with sudo count 0.5)
+
+```{r TCGA normalize sequencing counts}
+mRNA <- tcga_luad_mRNA$dat
+tmp.DESseqset <- mRNA %>% 
+  DESeq2::DESeqDataSetFromMatrix(colData = data.frame(rep(1, ncol(mRNA)),
+                                                      row.names = colnames(mRNA)), 
+                                 design = ~ 1)
+tmp.DESseqset <- DESeq2::estimateSizeFactors(tmp.DESseqset)
+mRNA.normalized <- log2(DESeq2::counts(tmp.DESseqset, normalized = TRUE) + 0.5)
+miRNA <- tcga_luad_miRNA$dat
+tmp.DESseqset <- miRNA %>% 
+  DESeq2::DESeqDataSetFromMatrix(colData = data.frame(rep(1, ncol(miRNA)),
+                                                      row.names = colnames(miRNA)), 
+                                 design = ~ 1)
+tmp.DESseqset <- DESeq2::estimateSizeFactors(tmp.DESseqset)
+miRNA.normalized <- log2(DESeq2::counts(tmp.DESseqset, normalized = TRUE) + 0.5)
+```
+
+We next subset the normalized miRNA table to features we're interested in. For miRNA, these are just the 5 miRNA signatures reported in 18167339. Note that let-7a has three family members - we average their expressions.
+
+```{r TCGA subset miRNA features}
+miRNA.normalized.subset <- miRNA.normalized[c("hsa-let-7a-1",
+                                    "hsa-let-7a-2",
+                                    "hsa-let-7a-3",
+                                    "hsa-mir-137",
+                                    "hsa-mir-182",
+                                    "hsa-mir-221",
+                                    "hsa-mir-372"),]
+miRNA.normalized.subset["hsa-let-7a-1",] <- 
+  apply(miRNA.normalized.subset[c("hsa-let-7a-1",
+                             "hsa-let-7a-2",
+                             "hsa-let-7a-3"),], 2, mean)
+miRNA.normalized.subset <- miRNA.normalized[c("hsa-let-7a-1",
+                                    "hsa-mir-137",
+                                    "hsa-mir-182",
+                                    "hsa-mir-221",
+                                    "hsa-mir-372"), ]
+rownames(miRNA.normalized.subset) <- miRNAs
+```
+
+For mRNA, we target the six-gene expression signature reported in 27437769.
+
+```{r mRNA signatures}
+mRNAs <- c("ABCC4", "ADRBK2", "KLHL23", "PDS5A", "UHRF1", "ZNF551")
+risk_mRNAs <- c("ABCC4" = -0.22096, "ADRBK2" = -0.52732, "KLHL23" = -0.64501,
+                "PDS5A" = -0.62813, "UHRF1" = 0.45151, "ZNF551" = -0.28384)
+print(risk_mRNAs)
+```
+
+```{r TCGA subset mRNA features}
+mRNA.normalized.subset <- mRNA.normalized[mRNAs,]
+rownames(mRNA.normalized.subset) <- mRNAs
+```
+
+Lastly, we match samples between miRNA, mRNA, and metadata tables. This requires resolving the [unique TCGA sample barcodes](https://docs.gdc.cancer.gov/Encyclopedia/pages/TCGA_Barcode/). We subset mRNA seq samples to only tumors, and mRNA samples to only tumors + mirVana. This yields unique mRNA samples for each subject, but one subject has two miRNA samples; we average their miRNA expressions for analysis.
+
+```{r TCGA sample barcodes}
+# process TCGA sample barcodes
+subjects_mRNA <- colnames(mRNA.normalized.subset) %>% 
+  stringr::str_sub(start = 1, end = 12)
+is_tumor_mRNA <- colnames(mRNA.normalized.subset) %>% 
+  stringr::str_sub(start = 14, end = 15) %>% 
+  as.numeric() %>% 
+  magrittr::is_less_than(10)
+subjects_mRNA <- subjects_mRNA[is_tumor_mRNA]
+names(subjects_mRNA) <- colnames(mRNA.normalized.subset)[is_tumor_mRNA]
+any(duplicated(subjects_mRNA))
+subjects_miRNA <- colnames(miRNA.normalized.subset) %>% 
+  stringr::str_sub(start = 1, end = 12)
+is_tumor_miRNA <- colnames(miRNA.normalized.subset) %>% 
+  stringr::str_sub(start = 14, end = 15) %>% 
+  as.numeric() %>% 
+  magrittr::is_less_than(10)
+is_mirVana_miRNA <- colnames(miRNA.normalized.subset) %>% 
+  stringr::str_sub(start = 20, end = 20) %>% 
+  magrittr::equals("H")
+subjects_miRNA <- subjects_miRNA[is_tumor_miRNA & is_mirVana_miRNA]
+names(subjects_miRNA) <- colnames(miRNA.normalized.subset)[is_tumor_miRNA & is_mirVana_miRNA]
+# Two miRNA samples map to the same subject
+names(subjects_miRNA)[subjects_miRNA %in% subjects_miRNA[duplicated(subjects_miRNA)]]
+# average its value
+miRNA.normalized.subset[, "TCGA-50-5946-01A-11H-1754-13"] <- 
+  (miRNA.normalized.subset[, "TCGA-50-5946-01A-11H-1754-13"] +
+     miRNA.normalized.subset[, "TCGA-50-5946-02A-11H-2089-13"]) / 2
+miRNA.normalized.subset <- miRNA.normalized.subset[, setdiff(colnames(miRNA.normalized.subset), 
+                                                   "TCGA-50-5946-02A-11H-2089-13")]
+subjects_miRNA <- subjects_miRNA[setdiff(names(subjects_miRNA), 
+                                         "TCGA-50-5946-02A-11H-2089-13")]
+# subset metadata, mRNA, and miRNA
+subjects_common <- intersect(intersect(subjects_mRNA, subjects_miRNA), 
+                             tb_meta_tcga$subject)
+tb_mRNA <- t(mRNA.normalized.subset) %>% 
+  as.data.frame() %>% tibble::rownames_to_column("sample") %>% 
+  dplyr::mutate(subject = subjects_mRNA[sample]) %>% 
+  dplyr::filter(subject %in% subjects_common) %>% 
+  dplyr::select(-sample)
+tb_miRNA <- t(miRNA.normalized.subset) %>% 
+  as.data.frame() %>% tibble::rownames_to_column("sample") %>% 
+  dplyr::mutate(subject = subjects_miRNA[sample]) %>% 
+  dplyr::filter(subject %in% subjects_common) %>% 
+  dplyr::select(-sample)
+tb_TCGA <- tb_meta_tcga %>% 
+  dplyr::filter(subject %in% subjects_common) %>% 
+  dplyr::left_join(tb_mRNA, by = "subject") %>% 
+  dplyr::left_join(tb_miRNA, by = "subject")
+tb_TCGA <- tb_TCGA %>% 
+  dplyr::mutate(risk_score_mRNA = as.matrix(tb_TCGA[, mRNAs]) %*% risk_mRNAs,
+                risk_score_miRNA = as.matrix(tb_TCGA[, miRNAs]) %*% risk_miRNAs)
+```
+
+## Reproduce results of 27437769 and 18167339 in TCGA
+We can see that the directionality of the univariate Cox regression coefficients agree with the risk score coefficients for mRNAs.
+
+```{r reproduce TCGA mRNA}
+hr_uni <- c(mRNAs, "risk_score_mRNA") %>% 
   purrr::map_dfr(function(variable) {
     survival::coxph(survival::Surv(survival_month, survival) ~ 
-                      df_yu2008_luad[, variable, drop = TRUE] + Age + Gender + factor(Stage),
-                    data = df_yu2008_luad) %>% 
+                      tb_TCGA[, variable, drop = TRUE],
+                    data = tb_TCGA) %>% 
       summary %>% 
       magrittr::extract2("coefficients") %>% 
       magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
       t() %>% as.data.frame() %>% 
       dplyr::mutate(variable = variable)
+  }) %>% 
+  print()
+```
+
+But not so well for miRNAs.
+
+```{r reproduce TCGA miRNA}
+hr_uni <- c(miRNAs, "risk_score_miRNA") %>% 
+  purrr::map_dfr(function(variable) {
+    survival::coxph(survival::Surv(survival_month, survival) ~ 
+                      tb_TCGA[, variable, drop = TRUE],
+                    data = tb_TCGA) %>% 
+      summary %>% 
+      magrittr::extract2("coefficients") %>% 
+      magrittr::extract(1, c("coef", "Pr(>|z|)")) %>% 
+      t() %>% as.data.frame() %>% 
+      dplyr::mutate(variable = variable)
+  }) %>% 
+  print()
+```
+
+# Mediation analysis
+Finally, we perform mediation analysis on the miRNA signatures (mediator) and mRNA signatures. The mediators are included in the model one at a time, while the mRNAs are jointly modelled. The causal effects of mediation for each mediator/mRNA pair as well as confidence intervals are reported. We compare between the naive model, using only data from TCGA, vs combined results, using both TCGA and the 18167339 dataset.
+
+```{r mediation}
+df_data <- df_yu2008_luad %>% 
+  dplyr::select(survival_month, survival, dplyr::one_of(miRNAs)) %>% 
+  dplyr::mutate(ABCC4 = NA_real_,
+                ADRBK2 = NA_real_,
+                KLHL23 = NA_real_,
+                PDS5A = NA_real_,
+                UHRF1 = NA_real_,
+                ZNF551 = NA_real_,
+                study = "Yu_et_al.",
+                missing = TRUE) %>% 
+  rbind(tb_TCGA %>% 
+          dplyr::select(survival_month, survival, 
+                        dplyr::one_of(miRNAs), dplyr::one_of(mRNAs)) %>% 
+          dplyr::mutate(study = "TCGA",
+                        missing = FALSE)) %>% 
+  dplyr::mutate(log_survival = log(survival_month + 0.5)) # this because there are
+# zero survival months in Yu et al.
+l_results <- miRNAs %>% 
+  purrr::map(function(miRNA) {
+    fit_obs = AFTmeta::gehan.obs(y = df_data$log_survival[!df_data$missing],
+                                 delta = df_data$survival[!df_data$missing],
+                                 matX = df_data[!df_data$missing, miRNA, 
+                                                drop = FALSE] %>% 
+                                   as.matrix(),
+                                 matZ = df_data[!df_data$missing, mRNAs] %>% 
+                                   as.matrix,
+                                 study = df_data$study[!df_data$missing],
+                                 missing = df_data$missing[!df_data$missing],
+                                 B = 500,
+                                 ncores = 6)
+    fit_opt = AFTmeta::gehan.opt(y = df_data$log_survival,
+                                     delta = df_data$survival,
+                                     matX = df_data[, miRNA, drop = FALSE] %>% 
+                                       as.matrix(),
+                                     matZ = df_data[, mRNAs] %>% as.matrix,
+                                     study = df_data$study,
+                                     missing = df_data$missing,
+                                     B = 500,
+                                     ncores = 6)
+    return(list(obs = fit_obs,
+                opt = fit_opt))
   })
+tb_results <- miRNAs %>% 
+  purrr::map2_dfr(l_results, function(miRNA, results) {
+    results %>% purrr::imap_dfr(function(fit, estimator)
+      tibble::tibble(miRNA = miRNA,
+                     effect = c("direct", mRNAs),
+                     estimator = estimator,
+                     coef = fit$coef,
+                     sd = sqrt(diag(fit$Sigma)))
+    )
+  })
+p <- tb_results %>% 
+  ggplot(aes(x = effect, y = coef, color = estimator)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_errorbar(aes(ymin = coef - 1.96*sd, ymax = coef + 1.96*sd),
+                position = position_dodge(width = 0.5),
+                width = 0.5) +
+  facet_grid(miRNA~.) +
+  scale_color_manual(values = c("obs" = "grey",
+                                "opt" = "black")) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  theme_bw()
+print(p) %>% 
+  ggsave(paste0(dir_output, "fig_mediation.pdf"), .,
+         width = 8, height = 6)
 ```
-We can see that the directionality of the Cox regression coefficients agree with the risk score coefficients
-```{r print results}
-rbind(hr_uni %>% dplyr::mutate(model = "univariate"),
-      hr_adj %>% dplyr::mutate(model = "adjusted"))
-```
-```{r TCGA}
-# tcga_luad_mRNA <- getTCGA(disease = "LUAD", data.type = "RNASeq", type = "count", filter = "Y",
-#                           p = getOption("mc.cores", 2L), clinical = TRUE, cvars = "OS")
-# tcga_luad_miRNA <- getTCGA(disease = "LUAD", data.type = "miRNASeq", type = "count", filter = "Y",
-#                            p = getOption("mc.cores", 2L), clinical = FALSE, cvars = "OS")
-# save( tcga_luad_mRNA, file='data/TCGA/mRNA.RData' )
-# save( tcga_luad_miRNA, file='data/TCGA/miRNA.RData' )
-load( 'data/TCGA/mRNA.RData' )
-load( 'data/TCGA/miRNA.RData' )
-samples_mRNA <- gsub( '................$', '', colnames( tcga_luad_mRNA[[1]] ), perl=T )
-samples_miRNA <- gsub( '................$', '', colnames( tcga_luad_miRNA[[1]] ), perl=T )
-df_meta_tcga <- data.frame( tcga_luad_mRNA$clinical,
-                            check.rows = F,
-                            stringsAsFactors = F
-)
-df_meta_tcga$yearstobirth <- as.numeric( df_meta_tcga$yearstobirth )
-df_meta_tcga$vitalstatus <- as.numeric( df_meta_tcga$vitalstatus )
-df_meta_tcga$daystodeath <- as.numeric( df_meta_tcga$daystodeath )
-df_meta_tcga$daystolastfollowup <- as.numeric( df_meta_tcga$daystolastfollowup )
-df_meta_tcga$survival_time <- df_meta_tcga$daystodeath
-df_meta_tcga$survival_time[is.na( df_meta_tcga$daystodeath )] <- 
-  df_meta_tcga$daystolastfollowup[is.na( df_meta_tcga$daystodeath )]
-df_meta_tcga <- df_meta_tcga[(!is.na(df_meta_tcga$survival_time)) & 
-                             (!is.na(df_meta_tcga$yearstobirth)) &
-                             (!is.na(df_meta_tcga$pathologicstage)), ]
-samples_common <- intersect( intersect( samples_mRNA, samples_miRNA ), rownames( df_meta_tcga ) )
-df_meta_tcga <- df_meta_tcga[samples_common, ]
-df_meta_tcga$stagenew <- df_meta_tcga$pathologicstage
-df_meta_tcga$stagenew[grepl( 'stage i([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'I'
-df_meta_tcga$stagenew[grepl( 'stage ii([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'II'
-df_meta_tcga$stagenew[grepl( 'stage iii([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'III'
-df_meta_tcga$stagenew[grepl( 'stage iv([a-b]*)$', df_meta_tcga$stagenew, perl=T )] <- 'IV'
-df_meta_tcga$stagenew <- factor( df_meta_tcga$stagenew, levels=c('I', 'II', 'III', 'IV') )
-df_meta_tcga$stageI <- df_meta_tcga$stagenew == 'I'
-df_meta_tcga$stageII <- df_meta_tcga$stagenew == 'II'
-df_meta_tcga$stageIII_IV <- df_meta_tcga$stagenew %in% c( 'III', 'IV' )
-# table( sapply( samples_common, function(sample)sum(samples_miRNA == sample) ) )
-# table( sapply( samples_common, function(sample)sum(samples_mRNA == sample) ) )
-mat_tcga_mRNA <- sapply( samples_common, function( sample ) {
-  tcga_luad_mRNA$dat[, grep(sample, 
-                            colnames( tcga_luad_mRNA$dat ), 
-                            fixed = T)[1]]
-} ) + 0.5
-colnames( mat_tcga_mRNA ) <- samples_common
-mat_tcga_mRNA <- log10( apply( mat_tcga_mRNA, 2, function(x) x/sum(x) ) )
-mat_tcga_miRNA <- sapply( samples_common, function( sample ) {
-  tcga_luad_miRNA$dat[, grep(sample, 
-                             colnames( tcga_luad_miRNA$dat ), 
-                             fixed = T)[1]]
-} ) + 0.5
-colnames( mat_tcga_miRNA ) <- samples_common
-mat_tcga_miRNA <- log10( apply( mat_tcga_miRNA, 2, function(x) x/sum(x) ) )
-mat_tcga_miRNA_hsa_let_7a <- matrix( mat_tcga_miRNA[1, ], nrow=1 )
-colnames( mat_tcga_miRNA_hsa_let_7a ) <- colnames( mat_tcga_miRNA )
-rownames( mat_tcga_miRNA_hsa_let_7a ) <- 'hsa-let-7a'
-# the three hsa-let-7a's have pretty similar expression
-mat_tcga_miRNA <- rbind( mat_tcga_miRNA, mat_tcga_miRNA_hsa_let_7a )
 
-mat_tcga_risk_score <- matrix( t(mat_tcga_miRNA[micrornas, ])%*%risk_equation, nrow=1 )
-colnames( mat_tcga_risk_score ) <- colnames( mat_tcga_miRNA )
-rownames( mat_tcga_risk_score ) <- 'risk_score'
-mat_tcga_miRNA <- rbind( mat_tcga_miRNA, mat_tcga_risk_score )
-@
-
-<<TCGA_validate_Yu_et_al_results, cache=T, echo=F, message=F, results='asis'>>=
-hr_uni_validation <- sapply( c(micrornas, 'risk_score'), function(microrna){
-  return( summary(coxph( Surv( survival_time/30, vitalstatus ) ~ mat_tcga_miRNA[microrna, ],
-                     data=df_meta_tcga ) )$coef[c(1, 3, 5)] )
-} )
-hr_multi_validation <- sapply( c(micrornas, 'risk_score'), function(microrna){
-  return( summary(coxph( Surv( survival_time/30, vitalstatus ) ~ mat_tcga_miRNA[microrna, ] + yearstobirth + gender + stagenew,
-                     data=df_meta_tcga ) )$coef[1, c(1, 3, 5)] )
-} )
-print( xtable( data.frame( microRNA=c( micrornas, 'risk_score'), log_hr_uni=hr_uni_validation[1, ], log_hr_uni_sd=hr_uni_validation[2, ], p_uni=hr_uni_validation[3, ], log_hr_multi=hr_multi_validation[1, ], log_hr_multi_sd=hr_multi_validation[2, ], p_multi=hr_multi_validation[3, ] ) ), include.rownames=F )
-```
+It is rather interesting to see that all microRNAs have strong and significant mediation effects on the gene UHRF1. Importantly, targeting the microRNA/UHRF1 pathways have also been proposed as a novel strategy for cancer therapy(29285183).
