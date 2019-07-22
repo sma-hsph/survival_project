@@ -60,7 +60,7 @@ stb2_Yu2008 <- readr::read_tsv("https://www.cell.com/cms/10.1016/j.ccr.2007.12.0
 # df_yu2008$stageIII_IV <- df_yu2008$Stage %in% c( 'III', 'IV' )
 # subset to subtype
 # table(stb2_Yu2008$`Cell type`)
-df_yu2008_luad <- subset(stb2_Yu2008, `Cell type`== "Squamous cell carcinoma")
+df_yu2008_luad <- subset(stb2_Yu2008, `Cell type`== "Adenocarcinoma")
 df_yu2008_luad$risk_score <- as.matrix(df_yu2008_luad[, miRNAs]) %*% risk_miRNAs
 hr_uni <- c(miRNAs, "risk_score") %>% 
   purrr::map_dfr(function(variable) {
@@ -306,6 +306,7 @@ df_data <- df_yu2008_luad %>%
                         missing = FALSE)) %>% 
   dplyr::mutate(log_survival = log(survival_month + 0.5)) # this because there are
 # zero survival months in Yu et al.
+save(df_data, file = "results/4-real_world/df_data.RData")
 l_results <- miRNAs %>% 
   purrr::map(function(miRNA) {
     fit_obs = AFTmeta::gehan.obs(y = df_data$log_survival[!df_data$missing],

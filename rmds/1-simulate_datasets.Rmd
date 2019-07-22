@@ -106,7 +106,7 @@ simulation_sanitycheck(tb_sim_II)
 ## Studies with heterngeneous ceonsoring distributions
 ```{r simulation parameters scenario III}
 # number of simulation runs
-rep <- 1:50
+rep <- 1:500
 # total sample size
 nSamples <- c(400)
 # number of studies
