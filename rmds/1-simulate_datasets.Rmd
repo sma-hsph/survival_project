@@ -28,7 +28,7 @@ library(magrittr)
 ## Homogeneous studies
 ```{r simulation parameters scenario I}
 # number of simulation runs
-rep <- 1:50
+rep <- 1:500
 # total sample size
 nSamples <- c(200)
 # number of studies
@@ -67,7 +67,7 @@ simulation_sanitycheck(tb_sim_I)
 ## Studies with heterngeneous eT distributions
 ```{r simulation parameters scenario II}
 # number of simulation runs
-rep <- 1:50
+rep <- 1:500
 # total sample size
 nSamples <- c(400)
 # number of studies
