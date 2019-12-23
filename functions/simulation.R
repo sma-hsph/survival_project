@@ -55,7 +55,6 @@ simulation <- function(b, a, # regression parameters.
   return(dfData)
 }
 
-library(magrittr)
 simulation_sanitycheck <- function(tb_sim) {
   tb_check <- tb_sim %>% 
     dplyr::mutate(check_k = purrr::map_dbl(missingness, length) == nStudies &

@@ -17,11 +17,12 @@ evaluate <- function(truth, # a length-p vector of true coefficients
       }
       data.frame(variable = i,
                  mean = mean(i_coef),
-                 sd = sd(i_coef),
+                 sd_empirical = sd(i_coef),
+                 sd_estimate = mean(sqrt(i_Sigma)),
                  bias = mean(i_coef) - i_truth,
                  MSE = sqrt(mean((i_coef - i_truth)^2)),
-                 coverage = mean(i_coef + 1.96*i_Sigma > i_truth & 
-                                   i_coef - 1.96*i_Sigma < i_truth)
+                 coverage = mean(i_coef + 1.96*sqrt(i_Sigma) > i_truth & 
+                                   i_coef - 1.96*sqrt(i_Sigma) < i_truth)
                  )
     })
 }

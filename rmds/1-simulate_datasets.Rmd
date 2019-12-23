@@ -17,9 +17,7 @@ knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```
 ```{r setup2, echo=FALSE}
 rm(list = ls())
-for(i.function in list.files("functions/", full.names = TRUE)) {
-  source(i.function)
-}
+smar::sourceDir("functions/")
 dir_output <- "results/1-simulate_datasets/"
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
@@ -27,8 +25,9 @@ library(magrittr)
 # Create table of simulation parameter combinations.
 ## Homogeneous studies
 ```{r simulation parameters scenario I}
+n_rep <- 500
 # number of simulation runs
-rep <- 1:500
+rep <- 1:n_rep
 # total sample size
 nSamples <- c(200)
 # number of studies
@@ -67,7 +66,7 @@ simulation_sanitycheck(tb_sim_I)
 ## Studies with heterngeneous eT distributions
 ```{r simulation parameters scenario II}
 # number of simulation runs
-rep <- 1:500
+rep <- 1:n_rep
 # total sample size
 nSamples <- c(400)
 # number of studies
@@ -106,7 +105,7 @@ simulation_sanitycheck(tb_sim_II)
 ## Studies with heterngeneous ceonsoring distributions
 ```{r simulation parameters scenario III}
 # number of simulation runs
-rep <- 1:500
+rep <- 1:n_rep
 # total sample size
 nSamples <- c(400)
 # number of studies
