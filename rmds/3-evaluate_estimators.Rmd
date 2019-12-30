@@ -26,15 +26,16 @@ knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```{r setup2, echo=FALSE}
 rm(list = ls())
 smar::sourceDir("functions/")
-dir_output <- "results/3-evaluate_estimators/"
+dir_project <- "~/Dropbox (Harvard University)/Survival Project/survival_paper/"
+dir_output <- paste0(dir_project, "results/3-evaluate_estimators/")
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 ```
 ```{r load datasets}
-load("results/1-simulate_datasets/scenarioI.RData")
-load("results/1-simulate_datasets/scenarioII.RData")
-load("results/1-simulate_datasets/scenarioIII.RData")
-load("results/2-run_estimators/fits.RData")
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
+load(paste0(dir_project, "results/2-run_estimators/fits.RData"))
 tb_sim <- rbind(
   tb_sim_I %>% dplyr::mutate(scenario = 1),
   tb_sim_II %>% dplyr::mutate(scenario = 2),
@@ -158,7 +159,8 @@ tb_print <- tb_eval %>%
   dplyr::mutate(censoring = percCens %>% purrr::map_chr(paste, collapse = ","), 
                 setup = paste0("censoring ", censoring)) %>% 
   dplyr::arrange(censoring, variable, estimator) %>% 
-  dplyr::select(setup, variable, estimator, mean, sd, bias, MSE, coverage)
+  dplyr::select(setup, variable, estimator, mean, bias, sd_empirical, sd_estimate, 
+                MSE, coverage)
 tb_print %>% 
   dplyr::filter(variable == 1) %>% 
   dplyr::select(-variable) %>% 

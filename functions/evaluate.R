@@ -10,8 +10,7 @@ evaluate <- function(truth, # a length-p vector of true coefficients
         purrr::map_dbl(~.x$coef[i])
       if(!is.null(l_results[[1]]$Sigma)) {
         i_Sigma <- l_results %>% 
-          purrr::map_dbl(~.x$Sigma[i, i]) %>% 
-          sqrt
+          purrr::map_dbl(~.x$Sigma[i, i])
       } else {
         i_Sigma <- NA
       }
