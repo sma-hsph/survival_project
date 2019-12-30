@@ -19,14 +19,14 @@ knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```{r setup2, echo=FALSE}
 rm(list = ls())
 smar::sourceDir("functions/")
-dir_output <- "results/2-run_estimators/"
+dir_output <- "../survival_paper/results/2-run_estimators/"
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 ```
 ```{r load datasets}
-load("results/1-simulate_datasets/scenarioI.RData")
-load("results/1-simulate_datasets/scenarioII.RData")
-load("results/1-simulate_datasets/scenarioIII.RData")
+load("../survival_paper/results/1-simulate_datasets/scenarioI.RData")
+load("../survival_paper/results/1-simulate_datasets/scenarioII.RData")
+load("../survival_paper/results/1-simulate_datasets/scenarioIII.RData")
 tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
                 tb_sim_II %>% dplyr::mutate(scenario = 2),
                 tb_sim_III %>% dplyr::mutate(scenario = 3))
