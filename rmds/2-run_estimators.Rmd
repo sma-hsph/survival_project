@@ -33,7 +33,7 @@ tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
 ```
 ```{r run estimators}
 B <- 500
-N <- 10
+N <- nrow(tb_sim)
 start.time <- Sys.time()
 l_results <-  Rmpi::mpi.parLapply(
   seq_len(N),
