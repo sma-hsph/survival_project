@@ -23,7 +23,8 @@ rm(list = ls())
 for(i.function in list.files("functions/", full.names = TRUE)) {
   source(i.function)
 }
-dir_output <- "results/4-real_world/"
+dir_project <- "~/Dropbox (Harvard University)/Survival Project/survival_paper/"
+dir_output <- paste0(dir_project, "results/4-real_world/")
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 library(ggplot2)
@@ -91,7 +92,8 @@ hr_uni <- c(miRNAs, "risk_score") %>%
 Next we perform similary analysis for TCGA lung cancer patients. First acquire data and perform metadata curation.
 
 ```{r TCGA metadata}
-dir.create("data/TCGA/", recursive = TRUE, showWarnings = FALSE)
+dir.create(paste0(dir_project, "data/TCGA/"), 
+           recursive = TRUE, showWarnings = FALSE)
 # Download TCGA data using TCGA2STAT; this only needs to be done once
 # tcga_luad_mRNA <- TCGA2STAT::getTCGA(disease = "LUAD", data.type = "RNASeq", 
 #                                      type = "count", filter = "Y",
@@ -103,8 +105,8 @@ dir.create("data/TCGA/", recursive = TRUE, showWarnings = FALSE)
 #                                       cvars = "OS")
 # save(tcga_luad_mRNA, file = "data/TCGA/mRNA.RData")
 # save( tcga_luad_miRNA, file= "data/TCGA/miRNA.RData")
-load("data/TCGA/mRNA.RData")
-load("data/TCGA/miRNA.RData")
+load(paste0(dir_project, "data/TCGA/mRNA.RData"))
+load(paste0(dir_project, "data/TCGA/miRNA.RData"))
 
 # curate metadata
 tb_meta_tcga <- tibble::as_tibble(tcga_luad_mRNA$clinical) %>% 
@@ -306,56 +308,47 @@ df_data <- df_yu2008_luad %>%
                         missing = FALSE)) %>% 
   dplyr::mutate(log_survival = log(survival_month + 0.5)) # this because there are
 # zero survival months in Yu et al.
-save(df_data, file = "results/4-real_world/df_data.RData")
-l_results <- miRNAs %>% 
-  purrr::map(function(miRNA) {
-    fit_obs = AFTmeta::gehan.obs(y = df_data$log_survival[!df_data$missing],
-                                 delta = df_data$survival[!df_data$missing],
-                                 matX = df_data[!df_data$missing, miRNA, 
-                                                drop = FALSE] %>% 
-                                   as.matrix(),
-                                 matZ = df_data[!df_data$missing, mRNAs] %>% 
-                                   as.matrix,
-                                 study = df_data$study[!df_data$missing],
-                                 missing = df_data$missing[!df_data$missing],
-                                 B = 500,
-                                 ncores = 6)
-    fit_opt = AFTmeta::gehan.opt(y = df_data$log_survival,
-                                     delta = df_data$survival,
-                                     matX = df_data[, miRNA, drop = FALSE] %>% 
-                                       as.matrix(),
-                                     matZ = df_data[, mRNAs] %>% as.matrix,
-                                     study = df_data$study,
-                                     missing = df_data$missing,
-                                     B = 500,
-                                     ncores = 6)
-    return(list(obs = fit_obs,
-                opt = fit_opt))
-  })
-tb_results <- miRNAs %>% 
-  purrr::map2_dfr(l_results, function(miRNA, results) {
-    results %>% purrr::imap_dfr(function(fit, estimator)
-      tibble::tibble(miRNA = miRNA,
-                     effect = c("direct", mRNAs),
-                     estimator = estimator,
-                     coef = fit$coef,
-                     sd = sqrt(diag(fit$Sigma)))
-    )
-  })
-p <- tb_results %>% 
-  ggplot(aes(x = effect, y = coef, color = estimator)) +
-  geom_point(position = position_dodge(width = 0.5)) +
-  geom_errorbar(aes(ymin = coef - 1.96*sd, ymax = coef + 1.96*sd),
-                position = position_dodge(width = 0.5),
-                width = 0.5) +
-  facet_grid(miRNA~.) +
-  scale_color_manual(values = c("obs" = "grey",
-                                "opt" = "black")) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
-  theme_bw()
-print(p) %>% 
-  ggsave(paste0(dir_output, "fig_mediation.pdf"), .,
-         width = 8, height = 6)
+save(df_data, file = paste0(dir_output, "df_data.RData"))
+
+tb_fits <- tidyr::crossing(miRNAs = miRNAs, 
+                           mRNAs = mRNAs)
+# l_results <- 
+#   seq_len(nrow(tb_fits)) %>% 
+#   purrr::map(function(i_fit) {
+#     fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
+#                                  delta = df_data$survival,
+#                                  matX = df_data[, tb_fits$miRNAs[i_fit], 
+#                                                 drop = FALSE] %>% 
+#                                    as.matrix(),
+#                                  matZ = df_data[, tb_fits$mRNAs[i_fit], 
+#                                                 drop = FALSE] %>% as.matrix,
+#                                  study = df_data$study,
+#                                  missing = df_data$missing,
+#                                  B = 500,
+#                                  ncores = 6,
+#                                  indirect = TRUE)
+#     return(fit_opt)
+#   })
+load(paste0(dir_output, "l_results.RData"))
+
+tb_print <- tb_fits %>% 
+  dplyr::mutate(results = l_results) %>% 
+  dplyr::group_by(1:dplyr::n()) %>% 
+  dplyr::mutate(coef_indirect = results[[1]]$coef_indirect,
+                sd_indirect = sqrt(results[[1]]$Sigma_indirect),
+                beta_Z = results[[1]]$coef[2],
+                sd_beta = sqrt(results[[1]]$Sigma[2, 2]),
+                alpha = results[[1]]$coef_alpha,
+                sd_alpha = sqrt(results[[1]]$Sigma_alpha[1, 1])) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(p_indirect = 2 * (1 - pnorm(abs(coef_indirect / sd_indirect)))) %>% 
+  dplyr::arrange(p_indirect) %>% 
+  dplyr::select(miRNAs, mRNAs, coef_indirect, sd_indirect, p_indirect,
+                beta_Z, sd_beta, alpha, sd_alpha)
+tb_print %>% 
+  knitr::kable(format = "html") %>% 
+  kableExtra::kable_styling() %>% 
+  kableExtra::scroll_box(height = "500px")
 ```
 
 It is rather interesting to see that all microRNAs have strong and significant mediation effects on the gene UHRF1. Importantly, targeting the microRNA/UHRF1 pathways have also been proposed as a novel strategy for cancer therapy(29285183).
