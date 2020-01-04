@@ -96,7 +96,8 @@ tb_print <- tb_eval %>%
                 censoring = percCens %>% purrr::map_dbl(unique),
                 setup = paste0("b_Z=", b_Z, ", ", censoring, " censoring")) %>% 
   dplyr::arrange(censoring, b_Z, variable, estimator) %>% 
-  dplyr::select(setup, variable, estimator, mean, bias, sd_empirical, sd_estimate, MSE, coverage)
+  dplyr::select(setup, variable, estimator, mean, bias, sd_empirical, 
+                sd_estimate, MSE, coverage)
 ```
 
 Performance of estimates of the non-missing coefficients can vary given b_Z:

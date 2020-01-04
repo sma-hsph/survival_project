@@ -310,45 +310,149 @@ df_data <- df_yu2008_luad %>%
 # zero survival months in Yu et al.
 save(df_data, file = paste0(dir_output, "df_data.RData"))
 
-tb_fits <- tidyr::crossing(miRNAs = miRNAs, 
-                           mRNAs = mRNAs)
-# l_results <- 
-#   seq_len(nrow(tb_fits)) %>% 
+tb_fits <- tidyr::crossing(miRNA = miRNAs, 
+                           mRNA = mRNAs)
+# l_results <-
+#   seq_len(nrow(tb_fits)) %>%
 #   purrr::map(function(i_fit) {
+#     fit_marginal <- AFTmeta::gehan.obs(y = df_data$log_survival,
+#                                        delta = df_data$survival,
+#                                        matX = df_data[, tb_fits$miRNAs[i_fit],
+#                                                       drop = FALSE] %>%
+#                                          as.matrix(),
+#                                        matZ = matrix(nrow = nrow(df_data),
+#                                                      ncol = 0),
+#                                        study = df_data$study,
+#                                        missing = df_data$missing,
+#                                        B = 500,
+#                                        ncores = 6)
 #     fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
-#                                  delta = df_data$survival,
-#                                  matX = df_data[, tb_fits$miRNAs[i_fit], 
-#                                                 drop = FALSE] %>% 
-#                                    as.matrix(),
-#                                  matZ = df_data[, tb_fits$mRNAs[i_fit], 
-#                                                 drop = FALSE] %>% as.matrix,
-#                                  study = df_data$study,
-#                                  missing = df_data$missing,
-#                                  B = 500,
-#                                  ncores = 6,
-#                                  indirect = TRUE)
-#     return(fit_opt)
+#                                   delta = df_data$survival,
+#                                   matX = df_data[, tb_fits$miRNAs[i_fit],
+#                                                  drop = FALSE] %>%
+#                                     as.matrix(),
+#                                   matZ = df_data[, tb_fits$mRNAs[i_fit],
+#                                                  drop = FALSE] %>% 
+#                                     as.matrix(),
+#                                   study = df_data$study,
+#                                   missing = df_data$missing,
+#                                   B = 500,
+#                                   ncores = 6,
+#                                   indirect = TRUE)
+#     return(list(fit_marginal = fit_marginal,
+#                 fit_opt = fit_opt))
 #   })
+# save(l_results, file = paste0(dir_output, "l_results.RData"))
 load(paste0(dir_output, "l_results.RData"))
+```
 
-tb_print <- tb_fits %>% 
+```{r display items}
+tb_summary <- tb_fits %>% 
   dplyr::mutate(results = l_results) %>% 
   dplyr::group_by(1:dplyr::n()) %>% 
-  dplyr::mutate(coef_indirect = results[[1]]$coef_indirect,
-                sd_indirect = sqrt(results[[1]]$Sigma_indirect),
-                beta_Z = results[[1]]$coef[2],
-                sd_beta = sqrt(results[[1]]$Sigma[2, 2]),
-                alpha = results[[1]]$coef_alpha,
-                sd_alpha = sqrt(results[[1]]$Sigma_alpha[1, 1])) %>% 
+  dplyr::mutate(
+    coef_total = results[[1]]$fit_marginal$coef,
+    var_total = results[[1]]$fit_marginal$Sigma[1, 1],
+    coef_direct = results[[1]]$fit_opt$coef[1],
+    var_direct = results[[1]]$fit_opt$Sigma[1, 1],
+    coef_indirect = results[[1]]$fit_opt$coef_indirect,
+    var_indirect = results[[1]]$fit_opt$Sigma_indirect[1, 1],
+    coef_conditional = results[[1]]$fit_opt$coef[2],
+    var_conditional = results[[1]]$fit_opt$Sigma[2, 2],
+    coef_alpha = results[[1]]$fit_opt$coef_alpha,
+    var_alpha = results[[1]]$fit_opt$Sigma_alpha[1, 1]) %>% 
   dplyr::ungroup() %>% 
-  dplyr::mutate(p_indirect = 2 * (1 - pnorm(abs(coef_indirect / sd_indirect)))) %>% 
-  dplyr::arrange(p_indirect) %>% 
-  dplyr::select(miRNAs, mRNAs, coef_indirect, sd_indirect, p_indirect,
-                beta_Z, sd_beta, alpha, sd_alpha)
-tb_print %>% 
-  knitr::kable(format = "html") %>% 
-  kableExtra::kable_styling() %>% 
-  kableExtra::scroll_box(height = "500px")
+  dplyr::select(-`1:dplyr::n()`, -results)
+
+tb_coef <- tb_summary %>% 
+  dplyr::select(miRNA, mRNA, dplyr::starts_with("coef")) %>% 
+  tidyr::pivot_longer(cols = dplyr::starts_with("coef"),
+                      names_to = "effect", values_to = "coef") %>% 
+  dplyr::mutate(effect = effect %>% 
+                  stringr::str_replace_all(stringr::fixed("coef_"),
+                                           "")) %>% 
+  dplyr::filter(effect != "total" | !duplicated(miRNA))
+tb_var <- tb_summary %>% 
+  dplyr::select(miRNA, mRNA, dplyr::starts_with("var")) %>% 
+  tidyr::pivot_longer(cols = dplyr::starts_with("var"),
+                      names_to = "effect", values_to = "var") %>% 
+  dplyr::mutate(effect = effect %>% 
+                  stringr::str_replace_all(stringr::fixed("var_"),
+                                           "")) %>% 
+  dplyr::filter(effect != "total" | !duplicated(miRNA))
+tb_plot <- tb_coef %>% 
+  dplyr::left_join(tb_var, by = c("miRNA", "mRNA", "effect")) %>% 
+  dplyr::mutate(sd = sqrt(var),
+                p = get_p(coef, sd))
+
+# Format variables for plotting
+tb_plot <- tb_plot %>% 
+  dplyr::mutate(miRNA_panel = factor(miRNA, 
+                                     levels = miRNAs),
+                mRNA_panel = ifelse(effect == "total",
+                                    "Marg.",
+                                    mRNA) %>% 
+                  factor(levels = c("Marg.", mRNAs)),
+                Effect = effect %>% 
+                  dplyr::recode_factor("total" = "miRNA total",
+                                       "direct" = "miRNA direct",
+                                       "indirect"= "miRNA indirect",
+                                       "conditional" = "RNA conditional",
+                                       "alpha" = "miRNA on RNA"),
+                `Estimated coefficient` = coef,
+                p_anno = dplyr::case_when(p < 0.001 ~ "***",
+                                          p < 0.01 ~ "**",
+                                          p < 0.05 ~ "*",
+                                          TRUE ~ ""))
+colors <- c("black", smar::gg_color_hue(n = 4))
+names(colors) <- levels(tb_plot$Effect)
+tb_p_anno <- tibble::tibble(Effect = 
+                              0.5,
+                            `Estimated coefficient` = 2,
+                            miRNA_panel = 
+                              factor(miRNAs[1],
+                                     levels = levels(tb_plot$miRNA_panel)),
+                            mRNA_panel = 
+                              factor(mRNAs[1],
+                                     levels = levels(tb_plot$mRNA_panel)),
+                            text = "* p < 0.05\n** p < 0.01\n*** p < 0.001")
+p_fig <- tb_plot %>% 
+  ggplot(aes(x = Effect, y = `Estimated coefficient`, 
+             color = Effect)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `Estimated coefficient` - 1.96 * sd,
+                    ymax = `Estimated coefficient` + 1.96 * sd),
+                width = 0.5) +
+  facet_grid(miRNA_panel ~ mRNA_panel, scales = "free_x", space = "free_x") +
+  geom_text(aes(x = Effect,
+                y = ifelse(coef > 0,
+                           coef + 1.96 * sd + 0.1,
+                           coef - 1.96 * sd - 0.1),
+                label = p_anno,
+                vjust = ifelse(coef > 0,
+                           0.5,
+                           1)),
+            color = "black",
+            size = 5) +
+  geom_text(data = tb_p_anno,
+            aes(x = Effect,
+                y = `Estimated coefficient`,
+                label = text),
+            color = "black",
+            size = 3,
+            vjust = 1,
+            hjust = 0) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_continuous(breaks = seq(from = -1.5, to = 2, by = 0.5)) +
+  scale_color_manual(values = colors) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave(p_fig, filename = paste0(dir_output, "fig_realworld.pdf"),
+       width = 12, height = 6)
 ```
 
 It is rather interesting to see that all microRNAs have strong and significant mediation effects on the gene UHRF1. Importantly, targeting the microRNA/UHRF1 pathways have also been proposed as a novel strategy for cancer therapy(29285183).
