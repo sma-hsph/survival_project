@@ -292,7 +292,7 @@ Finally, we perform mediation analysis on the miRNA signatures (mediator) and mR
 
 ```{r mediation}
 df_data <- df_yu2008_luad %>% 
-  dplyr::select(survival_month, survival, dplyr::one_of(miRNAs)) %>% 
+  dplyr::select(survival_month, survival, Age, Gender, dplyr::one_of(miRNAs)) %>% 
   dplyr::mutate(ABCC4 = NA_real_,
                 ADRBK2 = NA_real_,
                 KLHL23 = NA_real_,
@@ -302,47 +302,50 @@ df_data <- df_yu2008_luad %>%
                 study = "Yu_et_al.",
                 missing = TRUE) %>% 
   rbind(tb_TCGA %>% 
-          dplyr::select(survival_month, survival, 
+          dplyr::select(survival_month, survival, Age, Gender,
                         dplyr::one_of(miRNAs), dplyr::one_of(mRNAs)) %>% 
           dplyr::mutate(study = "TCGA",
                         missing = FALSE)) %>% 
-  dplyr::mutate(log_survival = log(survival_month + 0.5)) # this because there are
-# zero survival months in Yu et al.
+  dplyr::mutate(log_survival = log(survival_month + 0.5)) %>% # this because there are zero survival months in Yu et al.
+  dplyr::mutate(Gender = (Gender == "female") * 1)
 save(df_data, file = paste0(dir_output, "df_data.RData"))
+load(paste0(dir_output, "df_data.RData"))
 
 tb_fits <- tidyr::crossing(miRNA = miRNAs, 
                            mRNA = mRNAs)
-# l_results <-
-#   seq_len(nrow(tb_fits)) %>%
-#   purrr::map(function(i_fit) {
-#     fit_marginal <- AFTmeta::gehan.obs(y = df_data$log_survival,
-#                                        delta = df_data$survival,
-#                                        matX = df_data[, tb_fits$miRNAs[i_fit],
-#                                                       drop = FALSE] %>%
-#                                          as.matrix(),
-#                                        matZ = matrix(nrow = nrow(df_data),
-#                                                      ncol = 0),
-#                                        study = df_data$study,
-#                                        missing = df_data$missing,
-#                                        B = 500,
-#                                        ncores = 6)
-#     fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
-#                                   delta = df_data$survival,
-#                                   matX = df_data[, tb_fits$miRNAs[i_fit],
-#                                                  drop = FALSE] %>%
-#                                     as.matrix(),
-#                                   matZ = df_data[, tb_fits$mRNAs[i_fit],
-#                                                  drop = FALSE] %>% 
-#                                     as.matrix(),
-#                                   study = df_data$study,
-#                                   missing = df_data$missing,
-#                                   B = 500,
-#                                   ncores = 6,
-#                                   indirect = TRUE)
-#     return(list(fit_marginal = fit_marginal,
-#                 fit_opt = fit_opt))
-#   })
-# save(l_results, file = paste0(dir_output, "l_results.RData"))
+l_results <-
+  seq_len(nrow(tb_fits)) %>%
+  purrr::map(function(i_fit) {
+    fit_marginal <- AFTmeta::gehan.obs(y = df_data$log_survival,
+                                       delta = df_data$survival,
+                                       matX = df_data[, c("Age", "Gender", 
+                                                          tb_fits$miRNA[i_fit]),
+                                                      drop = FALSE] %>%
+                                         as.matrix(),
+                                       matZ = matrix(nrow = nrow(df_data),
+                                                     ncol = 0),
+                                       study = df_data$study,
+                                       missing = df_data$missing,
+                                       B = 500,
+                                       ncores = 3)
+    fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
+                                  delta = df_data$survival,
+                                  matX = df_data[, c("Age", "Gender", 
+                                                          tb_fits$miRNA[i_fit]),
+                                                      drop = FALSE] %>%
+                                         as.matrix(),
+                                  matZ = df_data[, tb_fits$mRNA[i_fit],
+                                                 drop = FALSE] %>%
+                                    as.matrix(),
+                                  study = df_data$study,
+                                  missing = df_data$missing,
+                                  B = 500,
+                                  ncores = 3,
+                                  indirect = TRUE)
+    return(list(fit_marginal = fit_marginal,
+                fit_opt = fit_opt))
+  })
+save(l_results, file = paste0(dir_output, "l_results.RData"))
 load(paste0(dir_output, "l_results.RData"))
 ```
 
@@ -352,15 +355,15 @@ tb_summary <- tb_fits %>%
   dplyr::group_by(1:dplyr::n()) %>% 
   dplyr::mutate(
     coef_total = results[[1]]$fit_marginal$coef,
-    var_total = results[[1]]$fit_marginal$Sigma[1, 1],
-    coef_direct = results[[1]]$fit_opt$coef[1],
-    var_direct = results[[1]]$fit_opt$Sigma[1, 1],
-    coef_indirect = results[[1]]$fit_opt$coef_indirect,
-    var_indirect = results[[1]]$fit_opt$Sigma_indirect[1, 1],
-    coef_conditional = results[[1]]$fit_opt$coef[2],
-    var_conditional = results[[1]]$fit_opt$Sigma[2, 2],
-    coef_alpha = results[[1]]$fit_opt$coef_alpha,
-    var_alpha = results[[1]]$fit_opt$Sigma_alpha[1, 1]) %>% 
+    var_total = results[[1]]$fit_marginal$Sigma[3, 3],
+    coef_direct = results[[1]]$fit_opt$coef[3],
+    var_direct = results[[1]]$fit_opt$Sigma[3, 3],
+    coef_indirect = results[[1]]$fit_opt$coef_indirect[3],
+    var_indirect = results[[1]]$fit_opt$Sigma_indirect[3, 3],
+    coef_conditional = results[[1]]$fit_opt$coef[4],
+    var_conditional = results[[1]]$fit_opt$Sigma[4, 4],
+    coef_alpha = results[[1]]$fit_opt$coef_alpha[3],
+    var_alpha = results[[1]]$fit_opt$Sigma_alpha[3, 3]) %>% 
   dplyr::ungroup() %>% 
   dplyr::select(-`1:dplyr::n()`, -results)
 
