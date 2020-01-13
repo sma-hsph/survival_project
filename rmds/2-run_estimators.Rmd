@@ -105,5 +105,5 @@ l_results <-  Rmpi::mpi.parLapply(
   tb_sim = tb_sim,
   B = B)
 print(Sys.time() - start.time)
-save(l_results, file = paste0(dir_output, "fits.RData"))
+save(l_results, file = paste0(dir_output, "fits_updated.RData"))
 ```
