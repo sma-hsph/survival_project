@@ -136,11 +136,15 @@ l_results <-  Rmpi::mpi.parLapply(
                         m = 10) 
     
     return(list(
-      obs = fit.obs,
-      full = fit.full,
-      opt = fit.opt,
-      fib = fit.fib,
-      mi = fit.mi
+      # obs = fit.obs,
+      # full = fit.full,
+      # opt = fit.opt,
+      # fib = fit.fib,
+      mi1 = fit.mi1,
+      mi2 = fit.mi2,
+      mi3 = fit.mi3,
+      mi4 = fit.mi4,
+      mi5 = fit.mi5
     ))
   },
   dir_output = dir_output,
