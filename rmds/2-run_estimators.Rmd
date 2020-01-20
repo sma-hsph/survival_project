@@ -26,18 +26,20 @@ dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 ```
 ```{r load datasets}
-load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
-load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
-load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
-tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
-                tb_sim_II %>% dplyr::mutate(scenario = 2),
-                tb_sim_III %>% dplyr::mutate(scenario = 3))
+# load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
+# load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
+# load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
+# tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
+#                 tb_sim_II %>% dplyr::mutate(scenario = 2),
+#                 tb_sim_III %>% dplyr::mutate(scenario = 3))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioIV.RData"))
+tb_sim <- tb_sim_IV %>% dplyr::mutate(scenario = 4)
 ```
 ```{r run estimators}
 B <- 500
 N <- nrow(tb_sim)
 start.time <- Sys.time()
-l_results <-  Rmpi::mpi.parLapply(
+l_results_IV <-  Rmpi::mpi.parLapply(
   seq_len(N),
   function(i,
            dir_output,
@@ -151,5 +153,5 @@ l_results <-  Rmpi::mpi.parLapply(
   tb_sim = tb_sim,
   B = B)
 print(Sys.time() - start.time)
-save(l_results, file = paste0(dir_output, "fits_updated.RData"))
+save(l_results_IV, file = paste0(dir_output, "fits_updated_IV.RData"))
 ```
