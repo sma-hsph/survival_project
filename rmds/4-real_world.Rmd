@@ -8,12 +8,12 @@ output:
 ---
 # Overview
 - Download miRNA only data from 18167339
-  - Validate signature miRNAs in the dataset.
+- Validate signature miRNAs in the dataset.
 - Download mRNA and microRNA data from TCGA.
-  - Preprocessing, including metadata curation and RNASeq data normalization.
-  - Validate signature miRNAs and mRNAs in the dataset
+- Preprocessing, including metadata curation and RNASeq data normalization.
+- Validate signature miRNAs and mRNAs in the dataset
 - Perform mediation meta-analysis on TCGA and 18167339.
-  - As it turns out, we found strong evidence for miRNA mediation effects on the lung cancer signature gene UHRF1. The microRNA/UHRF1 pathways have previously been reported in literature has novel cancer therapy targets.
+- As it turns out, we found strong evidence for miRNA mediation effects on the lung cancer signature gene UHRF1. The microRNA/UHRF1 pathways have previously been reported in literature has novel cancer therapy targets.
 
 ```{r setup, echo=FALSE} 
 knitr::opts_knit$set(root.dir = normalizePath(".."))
@@ -116,8 +116,8 @@ tb_meta_tcga <- tibble::as_tibble(tcga_luad_mRNA$clinical) %>%
                 daystodeath = as.numeric(daystodeath),
                 daystolastfollowup = as.numeric(daystolastfollowup),
                 survival_month = ifelse(is.na(daystodeath),
-                                       daystolastfollowup,
-                                       daystodeath) / 30,
+                                        daystolastfollowup,
+                                        daystodeath) / 30,
                 survival = vitalstatus,
                 Stage = pathologicstage %>% 
                   dplyr::recode_factor("stage i" = "I",
@@ -164,21 +164,21 @@ We next subset the normalized miRNA table to features we're interested in. For m
 
 ```{r TCGA subset miRNA features}
 miRNA.normalized.subset <- miRNA.normalized[c("hsa-let-7a-1",
-                                    "hsa-let-7a-2",
-                                    "hsa-let-7a-3",
-                                    "hsa-mir-137",
-                                    "hsa-mir-182",
-                                    "hsa-mir-221",
-                                    "hsa-mir-372"),]
+                                              "hsa-let-7a-2",
+                                              "hsa-let-7a-3",
+                                              "hsa-mir-137",
+                                              "hsa-mir-182",
+                                              "hsa-mir-221",
+                                              "hsa-mir-372"),]
 miRNA.normalized.subset["hsa-let-7a-1",] <- 
   apply(miRNA.normalized.subset[c("hsa-let-7a-1",
-                             "hsa-let-7a-2",
-                             "hsa-let-7a-3"),], 2, mean)
+                                  "hsa-let-7a-2",
+                                  "hsa-let-7a-3"),], 2, mean)
 miRNA.normalized.subset <- miRNA.normalized[c("hsa-let-7a-1",
-                                    "hsa-mir-137",
-                                    "hsa-mir-182",
-                                    "hsa-mir-221",
-                                    "hsa-mir-372"), ]
+                                              "hsa-mir-137",
+                                              "hsa-mir-182",
+                                              "hsa-mir-221",
+                                              "hsa-mir-372"), ]
 rownames(miRNA.normalized.subset) <- miRNAs
 ```
 
@@ -227,7 +227,7 @@ miRNA.normalized.subset[, "TCGA-50-5946-01A-11H-1754-13"] <-
   (miRNA.normalized.subset[, "TCGA-50-5946-01A-11H-1754-13"] +
      miRNA.normalized.subset[, "TCGA-50-5946-02A-11H-2089-13"]) / 2
 miRNA.normalized.subset <- miRNA.normalized.subset[, setdiff(colnames(miRNA.normalized.subset), 
-                                                   "TCGA-50-5946-02A-11H-2089-13")]
+                                                             "TCGA-50-5946-02A-11H-2089-13")]
 subjects_miRNA <- subjects_miRNA[setdiff(names(subjects_miRNA), 
                                          "TCGA-50-5946-02A-11H-2089-13")]
 # subset metadata, mRNA, and miRNA
@@ -316,7 +316,7 @@ tb_fits <- tidyr::crossing(miRNA = miRNAs,
 l_results <-
   seq_len(nrow(tb_fits)) %>%
   purrr::map(function(i_fit) {
-    fit_marginal <- AFTmeta::gehan.obs(y = df_data$log_survival,
+    fit_marginal_obs <- AFTmeta::gehan.obs(y = df_data$log_survival,
                                        delta = df_data$survival,
                                        matX = df_data[, c("Age", "Gender", 
                                                           tb_fits$miRNA[i_fit]),
@@ -327,22 +327,52 @@ l_results <-
                                        study = df_data$study,
                                        missing = df_data$missing,
                                        B = 500,
-                                       ncores = 3)
-    fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
-                                  delta = df_data$survival,
-                                  matX = df_data[, c("Age", "Gender", 
+                                       ncores = 6)
+    fit_marginal <- AFTmeta::gehan.obs(y = df_data$log_survival,
+                                       delta = df_data$survival,
+                                       matX = df_data[, c("Age", "Gender", 
                                                           tb_fits$miRNA[i_fit]),
                                                       drop = FALSE] %>%
                                          as.matrix(),
+                                       matZ = matrix(nrow = nrow(df_data),
+                                                     ncol = 0),
+                                       study = df_data$study,
+                                       missing = rep(FALSE, nrow(df_data)),
+                                       B = 500,
+                                       ncores = 6)
+    fit_opt_obs <- AFTmeta::gehan.obs(y = df_data$log_survival[!df_data$missing],
+                                      delta = df_data$survival[!df_data$missing],
+                                      matX = df_data[!df_data$missing, 
+                                                     c("Age", "Gender", 
+                                                         tb_fits$miRNA[i_fit]),
+                                                     drop = FALSE] %>%
+                                        as.matrix(),
+                                      matZ = df_data[!df_data$missing, 
+                                                     tb_fits$mRNA[i_fit],
+                                                     drop = FALSE] %>%
+                                        as.matrix(),
+                                      study = df_data$study[!df_data$missing],
+                                      missing = df_data$missing[!df_data$missing],
+                                      B = 500,
+                                      ncores = 6,
+                                      indirect = TRUE)
+    fit_opt <- AFTmeta::gehan.opt(y = df_data$log_survival,
+                                  delta = df_data$survival,
+                                  matX = df_data[, c("Age", "Gender", 
+                                                     tb_fits$miRNA[i_fit]),
+                                                 drop = FALSE] %>%
+                                    as.matrix(),
                                   matZ = df_data[, tb_fits$mRNA[i_fit],
                                                  drop = FALSE] %>%
                                     as.matrix(),
                                   study = df_data$study,
                                   missing = df_data$missing,
                                   B = 500,
-                                  ncores = 3,
+                                  ncores = 6,
                                   indirect = TRUE)
-    return(list(fit_marginal = fit_marginal,
+    return(list(fit_marginal_obs = fit_marginal_obs,
+                fit_marginal = fit_marginal,
+                fit_opt_obs = fit_opt_obs,
                 fit_opt = fit_opt))
   })
 save(l_results, file = paste0(dir_output, "l_results.RData"))
@@ -375,9 +405,9 @@ tb_summary <- c("", "_obs") %>%
     }) %>% 
   dplyr::mutate(Estimator = suffix %>% 
                   dplyr::recode_factor("_obs" = "obs",
-                                         .default = "opt"))
-  
-  
+                                       .default = "opt"))
+
+
 
 tb_coef <- tb_summary %>% 
   dplyr::select(miRNA, mRNA, Estimator, dplyr::starts_with("coef")) %>% 
@@ -397,6 +427,7 @@ tb_var <- tb_summary %>%
   dplyr::filter(effect != "total" | !duplicated(paste0(miRNA, Estimator)))
 tb_plot <- tb_coef %>% 
   dplyr::left_join(tb_var, by = c("miRNA", "mRNA", "effect", "Estimator")) %>% 
+  dplyr::filter(!(effect == "alpha" & Estimator == "obs")) %>% 
   dplyr::mutate(sd = sqrt(var),
                 p = get_p(coef, sd))
 
@@ -415,7 +446,7 @@ tb_plot <- tb_plot %>%
                                        "conditional" = "RNA conditional",
                                        "alpha" = "miRNA on RNA"),
                 `Estimated coefficient` = coef,
-                p_anno = dplyr::case_when(p < 0.05 ~ "*",
+                p_anno = dplyr::case_when(p < 0.1 ~ "*",
                                           # p < 0.01 ~ "**",
                                           # p < 0.05 ~ "*",
                                           TRUE ~ ""))
@@ -438,20 +469,20 @@ p_fig <- tb_plot %>%
              color = Effect)) +
   geom_point(aes(alpha = Estimator),
              position = position_dodge(width = 0.5)) +
-  geom_errorbar(aes(ymin = `Estimated coefficient` - 1.96 * sd,
-                    ymax = `Estimated coefficient` + 1.96 * sd,
+  geom_errorbar(aes(ymin = `Estimated coefficient` - 1.645 * sd,
+                    ymax = `Estimated coefficient` + 1.645 * sd,
                     alpha = Estimator),
                 width = 0.5,
                 position = position_dodge(width = 0.5)) +
   facet_grid(miRNA_panel ~ mRNA_panel, scales = "free_x", space = "free_x") +
   geom_text(aes(x = Effect,
                 y = ifelse(coef > 0,
-                           coef + 1.96 * sd + 0.1,
-                           coef - 1.96 * sd - 0.1),
+                           coef + 1.645 * sd + 0.1,
+                           coef - 1.645 * sd - 0.1),
                 label = p_anno,
                 vjust = ifelse(coef > 0,
-                           0.5,
-                           1),
+                               0.5,
+                               1),
                 group = Estimator),
             color = "black",
             size = 5,
@@ -469,7 +500,9 @@ p_fig <- tb_plot %>%
   scale_y_continuous(breaks = seq(from = -1.5, to = 2.5, by = 0.5),
                      limits = c(-1.3, 2.9)) +
   scale_color_manual(values = colors) +
-  scale_alpha_manual(values = alphas) +
+  scale_alpha_manual(values = alphas,
+                     labels = c("TCGA alone",
+                                "TCGA + Yu et al. (2008)")) +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         axis.title.x = element_blank(),
