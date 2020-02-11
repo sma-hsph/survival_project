@@ -1,3 +1,3 @@
 get_p <- function(coef, stderr) {
-  1 - pnorm(abs(coef / stderr))
+  pnorm(-abs(coef / stderr)) * 2
 }
