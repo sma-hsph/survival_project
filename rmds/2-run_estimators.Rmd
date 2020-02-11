@@ -26,20 +26,19 @@ dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 ```
 ```{r load datasets}
-# load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
 # load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
 # load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
 # tb_sim <- rbind(tb_sim_I %>% dplyr::mutate(scenario = 1),
 #                 tb_sim_II %>% dplyr::mutate(scenario = 2),
 #                 tb_sim_III %>% dplyr::mutate(scenario = 3))
-load(paste0(dir_project, "results/1-simulate_datasets/scenarioIV.RData"))
-tb_sim <- tb_sim_IV %>% dplyr::mutate(scenario = 4)
+tb_sim <- tb_sim_I
 ```
 ```{r run estimators}
 B <- 500
 N <- nrow(tb_sim)
 start.time <- Sys.time()
-l_results_IV <-  Rmpi::mpi.parLapply(
+l_results_I <-  Rmpi::mpi.parLapply(
   seq_len(N),
   function(i,
            dir_output,
@@ -52,42 +51,42 @@ l_results_IV <-  Rmpi::mpi.parLapply(
     pX <- nrow(i_sim$a[[1]])
     pZ <- ncol(i_sim$a[[1]])
     
-    # fit.obs <-
-    #   AFTmeta::gehan.obs(y = i_sim$dataset[[1]]$logY,
-    #                      delta = i_sim$dataset[[1]]$delta,
-    #                      matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
-    #                      matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
-    #                      study = i_sim$dataset[[1]]$study,
-    #                      missing = i_sim$dataset[[1]]$missing,
-    #                      B = B,
-    #                      ncores = 1)
-    # fit.full <-
-    #   AFTmeta::gehan.full(y = i_sim$dataset[[1]]$logY,
-    #                       delta = i_sim$dataset[[1]]$delta,
-    #                       matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
-    #                       matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
-    #                       study = i_sim$dataset[[1]]$study,
-    #                       missing = i_sim$dataset[[1]]$missing,
-    #                       B = B,
-    #                       ncores = 1)
-    # fit.opt <-
-    #   AFTmeta::gehan.opt(y = i_sim$dataset[[1]]$logY,
-    #                      delta = i_sim$dataset[[1]]$delta,
-    #                      matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
-    #                      matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
-    #                      study = i_sim$dataset[[1]]$study,
-    #                      missing = i_sim$dataset[[1]]$missing,
-    #                      B = B,
-    #                      ncores = 1)
-    # fit.fib <- 
-    #   AFTmeta::gehan.fib(y = i_sim$dataset[[1]]$logY,
-    #                      delta = i_sim$dataset[[1]]$delta,
-    #                      matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
-    #                      matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
-    #                      study = i_sim$dataset[[1]]$study,
-    #                      missing = i_sim$dataset[[1]]$missing, 
-    #                      B = B,
-    #                      ncores = 1)
+    fit.obs <-
+      AFTmeta::gehan.obs(y = i_sim$dataset[[1]]$logY,
+                         delta = i_sim$dataset[[1]]$delta,
+                         matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                         matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                         study = i_sim$dataset[[1]]$study,
+                         missing = i_sim$dataset[[1]]$missing,
+                         B = B,
+                         ncores = 1)
+    fit.full <-
+      AFTmeta::gehan.full(y = i_sim$dataset[[1]]$logY,
+                          delta = i_sim$dataset[[1]]$delta,
+                          matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                          matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                          study = i_sim$dataset[[1]]$study,
+                          missing = i_sim$dataset[[1]]$missing,
+                          B = B,
+                          ncores = 1)
+    fit.opt <-
+      AFTmeta::gehan.opt(y = i_sim$dataset[[1]]$logY,
+                         delta = i_sim$dataset[[1]]$delta,
+                         matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                         matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                         study = i_sim$dataset[[1]]$study,
+                         missing = i_sim$dataset[[1]]$missing,
+                         B = B,
+                         ncores = 1)
+    fit.fib <-
+      AFTmeta::gehan.fib(y = i_sim$dataset[[1]]$logY,
+                         delta = i_sim$dataset[[1]]$delta,
+                         matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                         matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                         study = i_sim$dataset[[1]]$study,
+                         missing = i_sim$dataset[[1]]$missing,
+                         B = B,
+                         ncores = 1)
     fit.mi1 <-
       AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
                         delta = i_sim$dataset[[1]]$delta,
@@ -138,10 +137,10 @@ l_results_IV <-  Rmpi::mpi.parLapply(
                         m = 10) 
     
     return(list(
-      # obs = fit.obs,
-      # full = fit.full,
-      # opt = fit.opt,
-      # fib = fit.fib,
+      obs = fit.obs,
+      full = fit.full,
+      opt = fit.opt,
+      fib = fit.fib,
       mi1 = fit.mi1,
       mi2 = fit.mi2,
       mi3 = fit.mi3,
@@ -153,5 +152,5 @@ l_results_IV <-  Rmpi::mpi.parLapply(
   tb_sim = tb_sim,
   B = B)
 print(Sys.time() - start.time)
-save(l_results_IV, file = paste0(dir_output, "fits_updated_IV.RData"))
+save(l_results_I, file = paste0(dir_output, "fits_updated_I.RData"))
 ```

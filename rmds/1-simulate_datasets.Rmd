@@ -18,7 +18,8 @@ knitr::opts_knit$set(root.dir = normalizePath(".."))
 ```{r setup2, echo=FALSE}
 rm(list = ls())
 smar::sourceDir("functions/")
-dir_output <- "results/1-simulate_datasets/"
+dir_project <- "~/Dropbox (Harvard University)/Survival Project/survival_paper/"
+dir_output <- paste0(dir_project, "results/1-simulate_datasets/")
 dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
 library(magrittr)
 ```
@@ -29,17 +30,19 @@ n_rep <- 500
 # number of simulation runs
 rep <- 1:n_rep
 # total sample size
-nSamples <- c(200)
+nSamples <- c(400)
 # number of studies
-nStudies <- c(2)
+nStudies <- c(4)
 # missingness of studies
-missingness <- tibble::tibble(missingness = list(c(FALSE, TRUE)))
+missingness <- tibble::tibble(missingness = list(c(FALSE, FALSE,
+                                                   TRUE, TRUE)))
 # distribution of error terms
-dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal")))
-sd_eT <- tibble::tibble(sd_eT = list(c(1, 1)))
+dist_eT <- tibble::tibble(dist_eT = list(c("normal", "normal",
+                                           "normal", "normal")))
+sd_eT <- tibble::tibble(sd_eT = list(c(1, 1, 1, 1)))
 # percentage censoring
-percCens <- tibble::tibble(percCens = list(c(0.1, 0.1),
-                                           c(0.4, 0.4)))
+percCens <- tibble::tibble(percCens = list(c(0.1, 0.1, 0.1, 0.1),
+                                           c(0.4, 0.4, 0.4, 0.4)))
 # true coefficients
 b <- tibble::tibble(b = list(c(1, 1, 0),
                              c(1, 1, 1),
@@ -62,7 +65,23 @@ tb_sim_I <- tidyr::crossing(
                     rep(1:nStudies, each = nSamples / nStudies)),
                 seed = 1:dplyr::n())
 simulation_sanitycheck(tb_sim_I)
+
+tb_sim_I <- tb_sim_I %>% 
+  dplyr::group_by(1:dplyr::n()) %>% 
+  dplyr::mutate(dataset = simulation(b = b[[1]],
+                                     a = a[[1]],
+                                     study = study[[1]],
+                                     missingness = missingness[[1]],
+                                     dist_eT = dist_eT[[1]],
+                                     sd_eT = sd_eT[[1]],
+                                     percCens = percCens[[1]],
+                                     seed = seed) %>% 
+                  list()) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::select(-`1:dplyr::n()`)
+save(tb_sim_I, file = paste0(dir_output, "scenarioI.RData"))
 ```
+
 ## Studies with heterngeneous eT distributions
 ```{r simulation parameters scenario II}
 # number of simulation runs
