@@ -18,6 +18,8 @@ output:
   5. mi: AFT version of the proposed multiple imputation estimator from 23857554.
       - They specified a MI model with random effects. In my implementation I used mice::mice and modelling the missing covariates after all other covariates, the censored log survival times, as well as the censoring variable.
       - Because data is generated with a linear model (log survival time ~ missing covariates + non-missing covariates), this means the MI would fail when censored survival time is not good surrogate for true survival. Additionally, any difference across cohorts (survival time distribution, censoring percentage) would cause this method to fail. Both of these can be observed across the three simulation scenarios.
+      - 1/18/2020 update: I followed Michelle's advice and added in survival function value
+      in the imuptation model. Five total imputation models are evaluated: 1. with only y, delta, X, and additionally 2. with marginal cumulative hazard function, 3. with marginal survival function, 4. with conditional cumulative hazard function, and 5. with conditional survival function.
 - Tables here correspond to the three summary tables in the current version of the manuscript.
 
 ```{r setup, echo=FALSE} 
@@ -35,7 +37,7 @@ library(magrittr)
 load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
 load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
 load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
-load(paste0(dir_project, "results/2-run_estimators/fits.RData"))
+load(paste0(dir_project, "results/2-run_estimators/fits_aggregated.RData"))
 tb_sim <- rbind(
   tb_sim_I %>% dplyr::mutate(scenario = 1),
   tb_sim_II %>% dplyr::mutate(scenario = 2),
@@ -59,8 +61,16 @@ tb_eval <- tb_sim %>%
                         l_results = results %>% purrr::map("opt"))),
     fib = list(evaluate(truth = b[[1]],
                         l_results = results %>% purrr::map("fib"))),
-    mi = list(evaluate(truth = b[[1]],
-                       l_results = results %>% purrr::map("mi")))
+    mi1 = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi1"))),
+    mi2 = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi2"))),
+    mi3 = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi3"))),
+    mi4 = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi4"))),
+    mi5 = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi5")))
   ) %>% 
   dplyr::ungroup() %>% 
   dplyr::group_by(1:dplyr::n()) %>% 
@@ -69,13 +79,21 @@ tb_eval <- tb_sim %>%
     full[[1]] %>% dplyr::mutate(estimator = "full"),
     opt[[1]] %>% dplyr::mutate(estimator = "opt"),
     fib[[1]] %>% dplyr::mutate(estimator = "fib"),
-    mi[[1]] %>% dplyr::mutate(estimator = "mi")
+    mi1[[1]] %>% dplyr::mutate(estimator = "mi1"),
+    mi2[[1]] %>% dplyr::mutate(estimator = "mi2"),
+    mi3[[1]] %>% dplyr::mutate(estimator = "mi3"),
+    mi4[[1]] %>% dplyr::mutate(estimator = "mi4"),
+    mi5[[1]] %>% dplyr::mutate(estimator = "mi5")
   ) %>% 
     dplyr::mutate(i_setup = i_setup, scenario = scenario) %>% 
     list()) %>% 
   magrittr::extract2("result_summarised") %>% 
   purrr::reduce(rbind) %>% 
-  dplyr::mutate(estimator = factor(estimator, levels = c("obs", "full", "opt", "fib", "mi")))
+  dplyr::mutate(estimator = factor(estimator, levels = c("obs", 
+                                                         "full", 
+                                                         "opt", 
+                                                         "fib", 
+                                                         paste0("mi", 1:5))))
 tb_eval <- tb_eval %>% 
   dplyr::left_join(tb_sim %>% dplyr::filter(rep == 1), by = c("i_setup", "scenario"))
 ```
