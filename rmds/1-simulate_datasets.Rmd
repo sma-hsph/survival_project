@@ -93,12 +93,15 @@ nStudies <- c(4)
 # missingness of studies
 missingness <- tibble::tibble(missingness = list(c(FALSE, FALSE, TRUE, TRUE)))
 # distribution of error terms
-tb_eT <- tibble::tibble(dist_eT = list(c("normal", "evd", "normal", "evd"),
-                                       c("normal", "normal", "evd", "evd"),
-                                       c("normal", "normal", "normal", "normal")),
-                        sd_eT = list(c(1, 1, 1, 1),
-                                     c(1, 1, 1, 1),
-                                     c(1, 4, 2, 3)))
+tb_eT <- tibble::tibble(
+  dist_eT = list(
+    c("normal", "evd", "normal", "evd"),
+                                         c("normal", "normal", "evd", "evd"),
+    c("normal", "normal", "normal", "normal")),
+  sd_eT = list(
+    c(1, 1, 1, 1),
+               c(1, 1, 1, 1),
+    c(1, 4, 2, 3)))
 # percentage censoring
 percCens <- tibble::tibble(percCens = list(c(0.1, 0.1, 0.1, 0.1)))
 # true coefficients

@@ -1,0 +1,109 @@
+---
+title: "3.1_Evaluate_MI.rmd"
+author: "Siyuan Ma"
+date: "11/28/2020"
+output: html_document
+---
+
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+```{r setup2, echo=FALSE}
+rm(list = ls())
+smar::sourceDir("~/Git/survival_project/functions/")
+dir_project <- "~/Dropbox (Harvard University)/Survival Project/survival_paper/"
+dir_output <- paste0(dir_project, "results/3-evaluate_estimators/")
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+```{r load datasets, echo=FALSE}
+# load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
+# load(paste0(dir_project, "results/2-run_estimators/fits_aggregated.RData"))
+load(paste0(dir_project, "results/2-run_estimators/fits_updated_MI.RData"))
+tb_sim <- rbind(
+  # tb_sim_I %>% dplyr::mutate(scenario = 1),
+  tb_sim_II %>% dplyr::mutate(scenario = 2),
+  tb_sim_III %>% dplyr::mutate(scenario = 3)
+)
+
+```
+
+* Two stage imputation model implemented through [micemd](https://cran.r-project.org/web/packages/micemd/index.html)
+* Fits random effects model on missing variable as outcome
+
+# Calculate metrics for all simulation scenarios.
+Metrics include mean, standard error, bias, mean squared error, and coverage probability.
+
+```{r evaluate estimators, echo=FALSE}
+tb_eval <- tb_sim %>% 
+  dplyr::mutate(results = l_results_MI) %>% 
+  dplyr::group_by(i_setup, scenario) %>% 
+  dplyr::summarise(
+    mi = list(evaluate(truth = b[[1]],
+                        l_results = results %>% purrr::map("mi")))
+  ) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::group_by(1:dplyr::n()) %>% 
+  dplyr::mutate(result_summarised = rbind(
+    mi[[1]] %>% dplyr::mutate(estimator = "mi")
+  ) %>% 
+    dplyr::mutate(i_setup = i_setup, scenario = scenario) %>% 
+    list()) %>% 
+  magrittr::extract2("result_summarised") %>% 
+  purrr::reduce(rbind) %>% 
+  dplyr::mutate(estimator = factor(estimator, levels = c("mi")))
+tb_eval <- tb_eval %>% 
+  dplyr::left_join(tb_sim %>% dplyr::filter(rep == 1), by = c("i_setup", "scenario"))
+```
+
+# Scenario II: studies with heterngeneous cohort characteristics
+
+* Distribution of underlying survival time is different across cohorts, 
+    * Family (normal or evd), 
+    * Standard deviation. 
+    * Interpretation: cohorts are of different populations and might have different characteristics.
+* Four studies (two missing, two non-missing)
+* Two stage MI assumes random effects of the imputation model, allowing heterogeneity
+
+```{r heterogeneous e_T, echo=FALSE}
+tb_print <- tb_eval %>% 
+  dplyr::filter(scenario == 2) %>%
+  dplyr::mutate(dist_eT = dist_eT %>% purrr::map_chr(paste, collapse = ","), 
+                sd_eT = sd_eT %>% purrr::map_chr(paste, collapse = ","),
+                setup = paste0("distribution ", dist_eT, ", sd(e_T) ", sd_eT)) %>% 
+  dplyr::arrange(dist_eT, sd_eT, variable, estimator) %>% 
+  dplyr::select(setup, variable, estimator, mean, bias, sd_empirical, MSE)
+tb_print %>% 
+  dplyr::filter(variable == 1) %>% 
+  dplyr::select(-variable) %>% 
+  knitr::kable(format = "html") %>% 
+  kableExtra::kable_styling() %>% 
+  kableExtra::scroll_box(height = "500px")
+```
+
+# Scenario III: studies with heterngeneous study designs.
+* Censoring distribution varies across cohorts. 
+    * Interpretation: cohorts have different designs (follow-up periods).
+* Four studies (two missing, two non-missing)
+* Two stage MI assumes random effects of the imputation model, allowing heterogeneity
+
+```{r heterogeneous percCens, echo=FALSE}
+tb_print <- tb_eval %>% 
+  dplyr::filter(scenario == 3) %>%
+  dplyr::mutate(censoring = percCens %>% purrr::map_chr(paste, collapse = ","), 
+                setup = paste0("censoring ", censoring)) %>% 
+  dplyr::arrange(censoring, variable, estimator) %>% 
+  dplyr::select(setup, variable, estimator, mean, bias, sd_empirical, MSE)
+tb_print %>% 
+  dplyr::filter(variable == 1) %>% 
+  dplyr::select(-variable) %>% 
+  knitr::kable(format = "html") %>% 
+  kableExtra::kable_styling() %>% 
+  kableExtra::scroll_box(height = "500px")
+```
+
+# Next steps:
+* Include survival estimator as imputation covariates
+* Additional simulation scenarios

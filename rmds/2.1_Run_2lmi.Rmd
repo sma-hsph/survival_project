@@ -1,0 +1,115 @@
+---
+title: "Run multiple state random imputation"
+author: "Siyuan Ma"
+date: "11/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+- Run multilevel imputation on heterogeneous datasets.
+
+```{r setup, echo=FALSE} 
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+```
+
+```{r setup2, echo=FALSE}
+rm(list = ls())
+smar::sourceDir("functions/")
+dir_project <- "~/Dropbox (Harvard University)/Survival Project/survival_paper/"
+# dir_project <- "/n/hutlab11_nobackup/users/syma/survival_project/survival_paper/"
+dir_output <- paste0(dir_project, "results/2-run_estimators/")
+dir.create(dir_output, recursive = TRUE, showWarnings = FALSE)
+library(magrittr)
+```
+```{r load datasets}
+# load(paste0(dir_project, "results/1-simulate_datasets/scenarioI.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioII.RData"))
+load(paste0(dir_project, "results/1-simulate_datasets/scenarioIII.RData"))
+tb_sim <- rbind(
+  # tb_sim_I %>% dplyr::mutate(scenario = 1),
+  tb_sim_II %>% dplyr::mutate(scenario = 2),
+  tb_sim_III %>% dplyr::mutate(scenario = 3))
+```
+```{r run estimators}
+B <- 500
+N <- nrow(tb_sim)
+start.time <- Sys.time()
+future::plan(future::multisession())
+l_results_MI <-  future.apply::future_lapply(
+  seq_len(N),
+  function(i) {
+    library(magrittr)
+    library(micemd)
+    
+    i_sim <- tb_sim[i, ]
+    pX <- nrow(i_sim$a[[1]])
+    pZ <- ncol(i_sim$a[[1]])
+    
+    fit.mi <- AFTmeta:::gehan.2lmi(y = i_sim$dataset[[1]]$logY,
+                                   delta = i_sim$dataset[[1]]$delta,
+                                   matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+                                   matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+                                   study = i_sim$dataset[[1]]$study,
+                                   missing = i_sim$dataset[[1]]$missing,
+                                   m = 10)
+    
+    # fit.mi1 <-
+    #   AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+    #                     delta = i_sim$dataset[[1]]$delta,
+    #                     matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+    #                     matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+    #                     study = i_sim$dataset[[1]]$study,
+    #                     missing = i_sim$dataset[[1]]$missing,
+    #                     m = 10) 
+    # fit.mi2 <-
+    #   AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+    #                     delta = i_sim$dataset[[1]]$delta,
+    #                     matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+    #                     matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+    #                     study = i_sim$dataset[[1]]$study,
+    #                     missing = i_sim$dataset[[1]]$missing,
+    #                     surv_est = "marg",
+    #                     surv_use = "H",
+    #                     m = 10) 
+    # fit.mi3 <-
+    #   AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+    #                     delta = i_sim$dataset[[1]]$delta,
+    #                     matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+    #                     matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+    #                     study = i_sim$dataset[[1]]$study,
+    #                     missing = i_sim$dataset[[1]]$missing,
+    #                     surv_est = "marg",
+    #                     surv_use = "S",
+    #                     m = 10) 
+    # fit.mi4 <-
+    #   AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+    #                     delta = i_sim$dataset[[1]]$delta,
+    #                     matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+    #                     matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+    #                     study = i_sim$dataset[[1]]$study,
+    #                     missing = i_sim$dataset[[1]]$missing,
+    #                     surv_est = "cond",
+    #                     surv_use = "H",
+    #                     m = 10) 
+    # fit.mi5 <-
+    #   AFTmeta::gehan.mi(y = i_sim$dataset[[1]]$logY,
+    #                     delta = i_sim$dataset[[1]]$delta,
+    #                     matX = i_sim$dataset[[1]][, 1:pX, drop = FALSE] %>% as.matrix,
+    #                     matZ = i_sim$dataset[[1]][, (pX + 1):(pX + pZ), drop = FALSE] %>% as.matrix,
+    #                     study = i_sim$dataset[[1]]$study,
+    #                     missing = i_sim$dataset[[1]]$missing,
+    #                     surv_est = "cond",
+    #                     surv_use = "S",
+    #                     m = 10) 
+    
+    return(list(
+      mi = fit.mi
+    ))
+  })
+print(Sys.time() - start.time)
+save(l_results_MI, file = paste0(dir_output, "fits_updated_MI.RData"))
+```
